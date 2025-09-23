@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>00بحث في المنتجات</title>
+  <title>بحث في المنتجات</title>
 
   <!-- مكتبات -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -292,7 +292,7 @@
     const headers = ["اسم المنتج", "سعر المنتج", "كود الميزان", "QR Code"];
 
     /**************************************************************************
-     * تحميل ملف الإكسل (كما في كودك الأصلي)
+     * تحميل ملف الإكسل (مثلما طلبت سابقًا)
      **************************************************************************/
     fetch("product.template(176).xlsx")
       .then(res => res.arrayBuffer())
@@ -317,7 +317,9 @@
 
     /**************************************************************************
      * --------------------  دوال الباسورد (مكانها هنا)  -----------------------
+     * الدوال: pressDigit, backspacePass, submitPass, showError, clearError
      **************************************************************************/
+
     passwordInput.addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -365,7 +367,7 @@
     }
 
     /**************************************************************************
-     * دعم الكيبورد العام (Enter للبحث، Delete لحذف آخر صف)
+     * دعم الكيبورد العام على الصفحة (Enter للبحث داخل التطبيق، Delete لحذف آخر صف)
      **************************************************************************/
     document.addEventListener('keydown', function(e) {
       if (app.style.display === 'block') {
@@ -383,13 +385,16 @@
     });
 
     /**************************************************************************
-     * دوال البحث وإدارة الجداول (مثل كودك الأصلي)
+     * دوال البحث وإدارة الجداول
      **************************************************************************/
     function search(fromScanner = false, scannerType = '', value = '') {
       const query = fromScanner ? (value + "").trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
       if (!query) {
-        // لو البحث جاء من الماسح وكان القيمة فارغة — مع ذلك نضمن تفريغ حقل البحث
-        if (fromScanner) searchBar.value = "";
+        if (fromScanner) {
+          // نضمن التفريغ حتى لو القيمة فارغة
+          searchBar.value = "";
+          searchBar.dispatchEvent(new Event('input'));
+        }
         return;
       }
       if (!Array.isArray(excelData) || excelData.length === 0) return;
@@ -417,8 +422,11 @@
             addBtn.textContent = 'إضافة';
             addBtn.addEventListener('click', function() {
               const added = addToFinal(row);
+              // نضمن تفريغ الحقل بعد محاولة الإضافة حتى لو كانت مرفوضة (مكرر)
+              searchBar.value = "";
+              searchBar.dispatchEvent(new Event('input'));
               if (added) {
-                searchBar.value = "";
+                // (باقي السلوك كما كان)
               }
             });
             tdAction.appendChild(addBtn);
@@ -430,10 +438,10 @@
 
           const exactMatch = ((d && d === query) || (c && c === query));
           if (exactMatch) {
-            const added = addToFinal(row);
-            if (added) {
-              searchBar.value = "";
-            }
+            // محاولة إضافة (قد تُعيد false لو مكرر) — بغض النظر عن النتيجة نفرغ الحقل
+            addToFinal(row);
+            searchBar.value = "";
+            searchBar.dispatchEvent(new Event('input'));
           }
         }
       });
@@ -442,9 +450,10 @@
         applyScaleFilterToTable(resultsTbody);
       }
 
-      // ضمان تفريغ الشريط فوراً لو البحث جاء من الماسح (التعديل الصغير الآمن)
+      // لو البحث جاء من الماسح (QR) نضمن التفريغ النهائي أيضاً
       if (fromScanner) {
         searchBar.value = "";
+        searchBar.dispatchEvent(new Event('input'));
       }
     }
 
@@ -520,7 +529,7 @@
       if (!tbody) return;
       const rows = Array.from(tbody.rows);
       rows.forEach(row => {
-        const cell = row.cells[2];
+        const cell = row.cells[2]; // كود الميزان (index 2)
         const val = cell ? (cell.textContent || "").trim() : "";
         row.style.display = (scaleFilterActive && val === "") ? 'none' : '';
       });
@@ -528,9 +537,8 @@
 
     /**************************************************************************
      * قارئ QR باستخدام html5-qrcode
-     * التعديل الصغير والآمن هنا: نتعامل مع الـ decodedText في دالة مخصصة ونضمن
-     * أن searchBar يُفرغ فوراً بعد المعالجة. كما نتجاهل قراءات متكررة جداً
-     * بنفس القيمة خلال 600ms (حماية ضد تكرار فريمات الكاميرا).
+     * - حماية ضد قراءات فريم متتالية بنفس القيمة (600ms)
+     * - نفريغ الحقل فوراً بعد أي محاولة معالجة
      **************************************************************************/
     let lastScan = { text: null, time: 0 };
 
@@ -553,9 +561,8 @@
         { facingMode: "environment" },
         config,
         (decodedText, decodedResult) => {
-          // نمرر النص المقروء لدالة مخصصة للتعامل (بدون الاعتماد على searchBar.value مباشرة)
           handleDecodedFromScanner(String(decodedText || ""));
-          // سلوك سابق: نوقف المسح بعد القراءة (نحافظ عليه)
+          // نوقف المسح كما كان في سلوكك السابق
           stopScanner();
         }
       ).then(() => {
@@ -570,24 +577,26 @@
     function handleDecodedFromScanner(decodedText) {
       if (!decodedText) {
         searchBar.value = "";
+        searchBar.dispatchEvent(new Event('input'));
         return;
       }
       const now = Date.now();
-      // تجاهل قراءات سريعة متكررة لنفس القيمة (حماية من فريمات الكاميرا المتتالية)
       if (decodedText === lastScan.text && (now - lastScan.time) < 600) {
-        // نضمن تفريغ الحقل لو كان التركيز يؤدي لتراكم
+        // تفريغ الحقل عشان لا يتراكم
         searchBar.value = "";
+        searchBar.dispatchEvent(new Event('input'));
         lastScan.time = now;
         return;
       }
       lastScan.text = decodedText;
       lastScan.time = now;
 
-      // استدعاء وظيفة البحث كما في كودك، مع تمرير القيمة مباشرة
+      // ننفذ البحث مع تمرير القيمة الممسوحة
       search(true, 'qr', decodedText);
 
-      // نضمن تفريغ الشريط فوراً بعد أي محاولة معالجة (حتى لو المنتج موجود مسبقاً)
+      // نضمن التفريغ فوراً بعد المعالجة (التعديل المطلوب)
       searchBar.value = "";
+      searchBar.dispatchEvent(new Event('input'));
       try { searchBar.blur(); } catch(e){}
     }
 
