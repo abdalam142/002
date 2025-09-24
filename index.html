@@ -10,200 +10,100 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>
 
   <style>
-    :root {
-      --card-bg: #ffffff;
-      --muted: #6c757d;
-      --primary: #0d6efd;
-      --success: #28a745;
-      --danger: #dc3545;
-      --accent: #20c997;
-      --warning: #ffc107;
+    :root{
+      --card-bg:#ffffff;
+      --muted:#6c757d;
+      --primary:#0d6efd;
+      --success:#28a745;
+      --danger:#dc3545;
+      --accent:#20c997;
     }
-    body {
-      font-family: Arial, sans-serif;
-      background: #f6f7fb;
-      color: #222;
-      margin: 0;
-      padding: 18px;
-      box-sizing: border-box;
-      direction: rtl;
+    body{
+      font-family:Arial, sans-serif;
+      background:#f6f7fb;
+      color:#222;
+      margin:0;
+      padding:18px;
+      box-sizing:border-box;
+      direction:rtl;
     }
-    h2 { text-align: center; margin: 6px 0 12px; }
+    h2{ text-align:center; margin:6px 0 12px; }
 
-    /* مؤشر حالة ملف الإكسل */
-    #status {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      padding: 8px 12px;
-      border-radius: 6px;
-      color: #fff;
-      font-weight: 700;
-      z-index: 60;
+    /* حالة ملف الإكسل */
+    #status{
+      position:fixed; top:12px; right:12px;
+      padding:8px 12px; border-radius:6px; color:#fff; font-weight:700; z-index:60;
     }
-    #status.active { background: var(--success); }
-    #status.inactive { background: var(--danger); }
+    #status.active{ background:var(--success); }
+    #status.inactive{ background:var(--danger); }
 
-    .searchRow {
-      text-align: center;
-      margin-bottom: 12px;
-      position: relative;
+    .searchRow{ text-align:center; margin-bottom:12px; position:relative; }
+    #searchBar{
+      width:60%; max-width:520px; padding:10px; font-size:16px; border-radius:8px; border:1px solid #ddd; box-sizing:border-box; display:inline-block;
     }
-    #searchBar {
-      width: 60%;
-      max-width: 520px;
-      padding: 10px;
-      font-size: 16px;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-      box-sizing: border-box;
-      display: inline-block;
+    .btn{
+      padding:10px 14px; margin:0 6px; border-radius:8px; border:none; cursor:pointer; font-size:15px; height:40px; line-height:18px;
     }
-    .btn {
-      padding: 10px 14px;
-      margin: 0 6px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-size: 15px;
-      height: 40px;
-      line-height: 18px;
-    }
-    .btn.primary { background: var(--primary); color: #fff; }
-    .btn.ghost { background: #e9ecef; }
-    .btn.camera { background: var(--accent); color: #fff; display:inline-flex; align-items:center; justify-content:center; }
+    .btn.primary{ background:var(--primary); color:#fff; }
+    .btn.ghost{ background:#e9ecef; }
+    .btn.camera{ background:var(--accent); color:#fff; display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; padding:0; border-radius:10px; }
 
-    /* قارئ QR - صغير جداً: مربع حوالي ضعف زر الكاميرا (~88px) */
-    #reader {
-      width: 88px;
-      height: 88px;
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      right: auto;
-      display: none;
-      z-index: 9999;
-      background: #fff;
-      border-radius: 8px;
-      padding: 4px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
-      overflow: hidden;
+    /* قارئ QR - صغير جداً: مربع تقريباً ضعف زر الكاميرا */
+    #reader{
+      width:88px; height:88px; position:fixed; top:12px; left:12px; right:auto;
+      display:none; z-index:9999; background:#000; border-radius:8px; padding:2px; box-shadow:0 2px 10px rgba(0,0,0,0.12); overflow:hidden;
     }
-    /* فرض أحجام صغيرة على عناصر html5-qrcode الداخليه */
-    #reader .html5-qrcode, 
-    #reader .html5-qrcode-element, 
-    #reader .html5-qrcode-region, 
-    #reader .html5-qrcode-region .html5-qrcode-video,
-    #reader video, 
-    #reader canvas {
-      width: 100% !important;
-      height: 100% !important;
-      max-width: 88px !important;
-      max-height: 88px !important;
-      object-fit: cover;
-      display: block;
+    /* اجبار أحجام عناصر html5-qrcode الداخلية لتبقى صغيرة */
+    #reader, #reader .html5-qrcode, #reader .html5-qrcode-element, #reader .html5-qrcode-region {
+      width:100% !important; height:100% !important; max-width:88px !important; max-height:88px !important;
     }
-    /* إخفاء نص/أزرار زائدة داخل مكتبة عند الحاجة */
-    #reader .html5-qrcode-button-camera, 
-    #reader .html5-qrcode-status { display: none !important; }
-
-    .tables {
-      display: flex;
-      gap: 18px;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-top: 16px;
-      flex-wrap: wrap;
+    #reader video, #reader canvas, #reader .html5-qrcode-video {
+      width:100% !important; height:100% !important; object-fit:cover !important; display:block !important;
     }
-    .col {
-      width: 48%;
-      background: var(--card-bg);
-      padding: 12px;
-      border-radius: 8px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.04);
-      box-sizing: border-box;
+    /* إخفاء عناصر تحكم زائدة من المكتبة */
+    #reader .html5-qrcode-button-camera, #reader .html5-qrcode-status, #reader .html5-qrcode-dashboard {
+      display:none !important;
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      word-wrap: break-word;
+    .tables{
+      display:flex; gap:18px; justify-content:space-between; align-items:flex-start; margin-top:16px; flex-wrap:wrap;
     }
-    thead th {
-      background: #f2f2f2;
-      padding: 8px;
-      border: 1px solid #ddd;
-      font-weight: 600;
-    }
-    tbody td {
-      padding: 8px;
-      border: 1px solid #ddd;
-      text-align: center;
-      vertical-align: middle;
+    .col{
+      width:48%; background:var(--card-bg); padding:12px; border-radius:8px; box-shadow:0 1px 6px rgba(0,0,0,0.04); box-sizing:border-box;
     }
 
-    /* أعمدة بعرض ثابت (نسب) */
-    table th:nth-child(1), table td:nth-child(1) { width: 40%; } /* اسم المنتج */
-    table th:nth-child(2), table td:nth-child(2) { width: 18%; } /* كود الميزان */
-    table th:nth-child(3), table td:nth-child(3) { width: 18%; } /* QR */
-    table th:nth-child(4), table td:nth-child(4) { width: 12%; } /* كمية */
-    table th:nth-child(5), table td:nth-child(5) { width: 12%; } /* إجراء */
+    table{ width:100%; border-collapse:collapse; table-layout:fixed; word-wrap:break-word; }
+    thead th{ background:#f2f2f2; padding:8px; border:1px solid #ddd; font-weight:600; }
+    tbody td{ padding:8px; border:1px solid #ddd; text-align:center; vertical-align:middle; }
 
-    .addBtn { background: #198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-    .delBtn { background: var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-    .moveBtn { background: var(--primary); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-    #clearAllBtn { background: var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
+    table th:nth-child(1), table td:nth-child(1){ width:40%; } /* اسم المنتج */
+    table th:nth-child(2), table td:nth-child(2){ width:18%; } /* كود الميزان */
+    table th:nth-child(3), table td:nth-child(3){ width:18%; } /* QR */
+    table th:nth-child(4), table td:nth-child(4){ width:12%; } /* كمية */
+    table th:nth-child(5), table td:nth-child(5){ width:12%; } /* إجراء */
 
-    /* صف بدون قيمة - معلم بالأحمر */
-    .no-value { background: #ffe5e5 !important; }
+    .addBtn{ background:#198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    .delBtn{ background:var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    .moveBtn{ background:var(--primary); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    #clearAllBtn{ background:var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
 
-    /* نافذة لوحة الأرقام المنبثقة */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.35);
-      display: none;
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
+    .no-value{ background:#ffe5e5 !important; }
+
+    .modal-overlay{
+      position:fixed; inset:0; background:rgba(0,0,0,0.35); display:none; z-index:200; align-items:center; justify-content:center;
     }
-    .modal {
-      background: #fff;
-      border-radius: 10px;
-      padding: 14px;
-      width: 320px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-      text-align: center;
-    }
-    .modal h4 { margin: 6px 0 10px; }
-    .num-input {
-      width: 100%;
-      padding: 10px;
-      font-size: 20px;
-      border-radius: 6px;
-      border: 1px solid #ddd;
-      text-align: center;
-      margin-bottom: 8px;
-    }
-    .modal .numpad { width: 100%; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; }
-    .small-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .modal{ background:#fff; border-radius:10px; padding:14px; width:320px; box-shadow:0 4px 20px rgba(0,0,0,0.2); text-align:center; }
+    .num-input{ width:100%; padding:10px; font-size:20px; border-radius:6px; border:1px solid #ddd; text-align:center; margin-bottom:8px; }
+    .modal .numpad{ width:100%; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:8px 0; }
+    .small-note{ font-size:12px; color:var(--muted); margin-top:6px; }
 
-    /* صغير لإظهار القيمة القديمة بجانب القيمة الجديدة */
-    .old-value-badge {
-      font-size: 12px;
-      color: #fff;
-      background: #6c757d;
-      padding: 2px 6px;
-      border-radius: 6px;
-      margin-right: 6px;
-    }
+    .old-value-badge{ font-size:12px; color:#fff; background:#6c757d; padding:2px 6px; border-radius:6px; margin-right:6px; }
 
-    @media (max-width: 900px) {
-      .tables { flex-direction: column; }
-      .col { width: 100%; }
-      #reader { width: 88px; left: 12px; right: auto; top: 12px; height: 88px; }
-      #searchBar { width: 85%; }
+    @media (max-width:900px){
+      .tables{ flex-direction:column; }
+      .col{ width:100%; }
+      #reader{ left:12px; top:12px; width:88px; height:88px; }
+      #searchBar{ width:85%; }
     }
   </style>
 </head>
@@ -215,17 +115,17 @@
   <div id="app">
     <div class="searchRow" role="region" aria-label="شريط البحث">
       <input id="searchBar" type="text" placeholder="اكتب الاسم أو الباركود أو وصف المنتج" aria-label="بحث">
-      <button id="searchBtn" class="btn primary" onclick="search(false)">بحث</button>
-      <button id="clearBtn" class="btn ghost" onclick="clearSearch()">حذف</button>
-      <button id="cameraBtn" class="btn camera" onclick="toggleScanner()">📷</button>
-      <button id="moveAllBtn" class="btn" style="background:#0b5ed7;color:#fff;" onclick="moveAllToCompleted()">نقل كل المنتجات</button>
+      <button id="searchBtn" class="btn primary" title="بحث">بحث</button>
+      <button id="clearBtn" class="btn ghost" title="حذف">حذف</button>
+      <button id="cameraBtn" class="btn camera" title="كاميرا">📷</button>
+      <button id="moveAllBtn" class="btn" style="background:#0b5ed7;color:#fff;" title="نقل كل المنتجات">نقل كل</button>
     </div>
 
     <div id="reader" aria-hidden="true"></div>
 
     <div class="tables">
       <div class="col" aria-label="سجل الاستلام">
-        <h3>سجل الاستلام (تسجيل)</h3>
+        <h3>سجل الاستلام (التسجيل)</h3>
         <div style="text-align:left; margin-bottom:6px;">
           <button id="clearAllBtn" onclick="clearAllCompleted()" style="display:none;">حذف الكل</button>
         </div>
@@ -286,15 +186,11 @@
   <div id="oldValuePopup" style="position:fixed; display:none; z-index:220; background:#333; color:#fff; padding:6px 8px; border-radius:6px; font-size:13px;"></div>
 
   <script>
-    /**************************************************************************
-     * متغيرات عامة
-     **************************************************************************/
-    let excelData = [];        // بيانات الإكسل كـ array of arrays
-    let qrScanner = null;      // مثيل html5-qrcode
-    let scanningMode = null;   // 'qr' أو null
+    let excelData = [];
+    let qrScanner = null;
+    let scanningMode = null;
     let lastScan = { text: null, time: 0 };
 
-    /* عناصر DOM */
     const statusEl = document.getElementById('status');
     const app = document.getElementById('app');
 
@@ -308,14 +204,13 @@
     const modalInput = document.getElementById('modalInput');
     const oldValuePopup = document.getElementById('oldValuePopup');
 
-    let pendingRowForValue = null; // {rowEl}
+    let pendingRowForValue = null;
 
     const sourceXlsxName = "product.template(176).xlsx";
 
-    // أظهر التطبيق مباشرة (حذف صفحة الباسورد)
     app.style.display = 'block';
 
-    // محاولة قراءة ملف الإكسل المصدر عند التحميل
+    // Load Excel template if available
     fetch(sourceXlsxName)
       .then(res => res.arrayBuffer())
       .then(data => {
@@ -337,16 +232,11 @@
         statusEl.className = "inactive";
       });
 
-    /**************************************************************************
-     * البحث وإظهار النتائج
-     **************************************************************************/
+    /* ---------- Search behavior: show matches in the right table; user selects and clicks "استلام" ---------- */
     function search(fromScanner = false, value = '') {
       const query = fromScanner ? (String(value || "")).trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
       if (!query) {
-        if (fromScanner) {
-          searchBar.value = "";
-          searchBar.dispatchEvent(new Event('input'));
-        }
+        if (fromScanner) { searchBar.value = ""; searchBar.dispatchEvent(new Event('input')); }
         return;
       }
       if (!Array.isArray(excelData) || excelData.length === 0) return;
@@ -356,7 +246,7 @@
       excelData.forEach((row, idx) => {
         if (idx === 0) return; // header
         const name = (row[0] || "").toString();
-        const price = (row[1] || "").toString(); // نقرأه لكن لا نظهره
+        const price = (row[1] || "").toString();
         const scaleCode = (row[2] || "").toString();
         const qr = (row[3] || "").toString();
 
@@ -365,6 +255,7 @@
         const d = qr.toLowerCase();
 
         if (a.includes(query) || c.includes(query) || d.includes(query)) {
+          // prevent duplicates in results table
           const exists = Array.from(resultsTbody.rows).some(r => {
             const rQr = (r.cells[2] && r.cells[2].textContent) || "";
             const rCode = (r.cells[1] && r.cells[1].textContent) || "";
@@ -372,11 +263,7 @@
           });
           if (exists) {
             const tr = document.createElement('tr');
-            const td0 = document.createElement('td'); td0.textContent = name; tr.appendChild(td0);
-            const td1 = document.createElement('td'); td1.textContent = scaleCode; tr.appendChild(td1);
-            const td2 = document.createElement('td'); td2.textContent = qr; tr.appendChild(td2);
-            const td3 = document.createElement('td'); td3.textContent = ''; tr.appendChild(td3);
-            const td4 = document.createElement('td'); td4.textContent = 'مكرر'; tr.appendChild(td4);
+            tr.innerHTML = `<td>${name}</td><td>${scaleCode}</td><td>${qr}</td><td></td><td>مكرر</td>`;
             resultsTbody.appendChild(tr);
             return;
           }
@@ -389,30 +276,36 @@
           const tdQty = document.createElement('td'); tdQty.textContent = ''; tr.appendChild(tdQty);
           const tdAction = document.createElement('td');
 
-          const receiveBtn = document.createElement('button'); receiveBtn.className = 'addBtn'; receiveBtn.textContent = 'استلام';
+          const receiveBtn = document.createElement('button');
+          receiveBtn.className = 'addBtn';
+          receiveBtn.textContent = 'استلام';
           receiveBtn.addEventListener('click', () => openQuantityModal(tr));
           tdAction.appendChild(receiveBtn);
 
-          const moveBtn = document.createElement('button'); moveBtn.className = 'moveBtn'; moveBtn.style.marginRight = '6px'; moveBtn.textContent = 'نقل';
+          const moveBtn = document.createElement('button');
+          moveBtn.className = 'moveBtn';
+          moveBtn.style.marginRight = '6px';
+          moveBtn.textContent = 'نقل';
           moveBtn.addEventListener('click', () => moveRowToCompleted(tr));
           tdAction.appendChild(moveBtn);
 
-          const deleteBtn = document.createElement('button'); deleteBtn.className = 'delBtn'; deleteBtn.style.marginRight = '6px'; deleteBtn.textContent = 'حذف';
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'delBtn';
+          deleteBtn.style.marginRight = '6px';
+          deleteBtn.textContent = 'حذف';
           deleteBtn.addEventListener('click', () => { tr.remove(); checkClearAllVisibility(); });
           tdAction.appendChild(deleteBtn);
 
           tr.appendChild(tdAction);
           resultsTbody.appendChild(tr);
 
+          // Do NOT auto-open modal on keyboard search; only when scanner sends exact match
           const exactMatch = ((d && d === query) || (c && c === query));
           if (fromScanner && exactMatch) openQuantityModal(tr);
         }
       });
 
-      if (fromScanner) {
-        searchBar.value = "";
-        searchBar.dispatchEvent(new Event('input'));
-      }
+      if (fromScanner) { searchBar.value = ""; searchBar.dispatchEvent(new Event('input')); }
     }
 
     function clearSearch() {
@@ -420,9 +313,7 @@
       resultsTbody.innerHTML = "";
     }
 
-    /**************************************************************************
-     * نافذة إدخال الكمية (دائماً بالكجم)
-     **************************************************************************/
+    /* ---------- Quantity modal ---------- */
     function openQuantityModal(row) {
       if (modalOverlay.style.display === 'flex') return;
       pendingRowForValue = { rowEl: row };
@@ -430,10 +321,7 @@
       modalOverlay.style.display = 'flex';
       modalInput.focus();
     }
-    function closeModal() {
-      modalOverlay.style.display = 'none';
-      pendingRowForValue = null;
-    }
+    function closeModal() { modalOverlay.style.display = 'none'; pendingRowForValue = null; }
     function modalDigit(d) { modalInput.value = (modalInput.value || "") + d; }
     function modalDot() { if (!modalInput.value.includes('.')) modalInput.value = (modalInput.value || "") + '.'; }
     function modalBack() { modalInput.value = (modalInput.value || "").slice(0, -1); }
@@ -485,9 +373,7 @@
       setTimeout(() => { oldValuePopup.style.display = 'none'; }, 1800);
     }
 
-    /**************************************************************************
-     * نقل/إضافة إلى المكتمل
-     **************************************************************************/
+    /* ---------- Move to completed ---------- */
     function moveRowToCompleted(row) {
       const qtyCell = row.cells[3];
       const qty = parseFloat(qtyCell.getAttribute('data-qty') || '');
@@ -512,9 +398,41 @@
 
       const tdAction = document.createElement('td');
       const delBtn = document.createElement('button'); delBtn.className = 'delBtn'; delBtn.textContent = 'حذف';
-      delBtn.addEventListener('click', function() { this.closest('tr').remove(); checkClearAllVisibility(); });
+      delBtn.addEventListener('click', function(){ this.closest('tr').remove(); checkClearAllVisibility(); });
       tdAction.appendChild(delBtn);
       tr.appendChild(tdAction);
 
       finalTbody.appendChild(tr);
-  
+      row.remove();
+      checkClearAllVisibility();
+    }
+
+    function moveAllToCompleted() {
+      const rows = Array.from(resultsTbody.rows);
+      let movedAny = false;
+      for (const row of rows) {
+        const qtyCell = row.cells[3];
+        const qty = parseFloat(qtyCell.getAttribute('data-qty') || '');
+        if (qty && !isNaN(qty) && qty > 0) {
+          const name = (row.cells[0] && row.cells[0].textContent) || '';
+          const scaleCode = (row.cells[1] && row.cells[1].textContent) || '';
+          const qr = (row.cells[2] && row.cells[2].textContent) || '';
+
+          const existsLeft = Array.from(finalTbody.rows).some(r => {
+            const rQr = (r.cells[2] && r.cells[2].textContent) || "";
+            const rCode = (r.cells[1] && r.cells[1].textContent) || "";
+            return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
+          });
+          if (!existsLeft) {
+            const tr = document.createElement('tr');
+            const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
+            const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
+            const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
+            const td3 = document.createElement('td'); td3.textContent = qty + ' كجم'; td3.setAttribute('data-qty', String(qty)); tr.appendChild(td3);
+            const tdAction = document.createElement('td');
+            const delBtn = document.createElement('button'); delBtn.className = 'delBtn'; delBtn.textContent = 'حذف';
+            delBtn.addEventListener('click', function(){ this.closest('tr').remove(); checkClearAllVisibility(); });
+            tdAction.appendChild(delBtn);
+            tr.appendChild(tdAction);
+            finalTbody.appendChild(tr);
+            row.remov
