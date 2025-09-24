@@ -225,7 +225,7 @@
   <div id="status" class="inactive">لا يوجد ملف فعال</div>
 
   <div id="loginBox" aria-live="polite">
-    <input id="passwordInput" type="password" placeholder="ادخل كلمة المرور" aria-label="كلمة المرور">
+    <input id="passwordInput" type="password" placeholder="ادخل كلمة المرور" aria-label="كلمة المرور" autofocus inputmode="numeric" />
     <div class="numpad" style="margin-top:12px;">
       <button onclick="pressDigit('1')">1</button>
       <button onclick="pressDigit('2')">2</button>
@@ -352,26 +352,35 @@
 
     let pendingReceive = null;
 
-    fetch("product.template(176).xlsx")
-      .then(res => res.arrayBuffer())
-      .then(data => {
+    const excelCandidates = [
+      "product.template(176).xlsx",
+      "product.template.xlsx",
+      "products.xlsx",
+      "product.xlsx"
+    ];
+
+    async function tryLoadExcelList(list) {
+      for (const name of list) {
         try {
+          const res = await fetch(name);
+          if (!res.ok) continue;
+          const data = await res.arrayBuffer();
           const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
           const firstSheet = workbook.SheetNames[0];
           excelData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { header: 1 });
-          statusEl.textContent = "ملف فعال";
+          statusEl.textContent = "ملف فعال: " + name;
           statusEl.className = "active";
-        } catch (err) {
-          console.error("خطأ قراءة الإكسل:", err);
-          statusEl.textContent = "ملف غير صالح";
-          statusEl.className = "inactive";
+          return true;
+        } catch (e) {
+          console.warn("فشل قراءة:", name, e);
         }
-      })
-      .catch(err => {
-        console.warn("لم يتم العثور على ملف الإكسل:", err);
-        statusEl.textContent = "لا يوجد ملف فعال";
-        statusEl.className = "inactive";
-      });
+      }
+      statusEl.textContent = "لا يوجد ملف فعال";
+      statusEl.className = "inactive";
+      return false;
+    }
+
+    tryLoadExcelList(excelCandidates);
 
     passwordInput.addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
@@ -385,10 +394,12 @@
 
     function pressDigit(d) {
       passwordInput.value = (passwordInput.value || "") + d;
+      passwordInput.focus();
       clearError();
     }
     function backspacePass() {
       passwordInput.value = (passwordInput.value || "").slice(0, -1);
+      passwordInput.focus();
       clearError();
     }
     function submitPass() {
@@ -396,7 +407,7 @@
         loginBox.style.display = "none";
         app.style.display = "block";
         clearError();
-        setTimeout(() => { if (searchBar) searchBar.focus(); }, 150);
+        setTimeout(() => { try { searchBar.focus(); } catch(e){} }, 150);
       } else {
         showError("كلمة المرور غير صحيحة");
       }
@@ -601,11 +612,4 @@
       const codeVal = (rowData[2] || "").toString();
       if (codeVal && codeVal.trim() !== "") {
         receiveTitle.textContent = 'أدخل الوزن (كجم)';
-        receiveInput.placeholder = 'الوزن بالكيلو جرام';
-      } else {
-        receiveTitle.textContent = 'أدخل العدد';
-        receiveInput.placeholder = 'العدد';
-      }
-
-      const qrVal = (rowData[3] || "").toString();
-      const code = (ro
+  
