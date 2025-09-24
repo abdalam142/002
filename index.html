@@ -26,7 +26,7 @@
     input[type="text"]{padding:10px 12px; border-radius:8px; border:1px solid #ddd; width:420px; font-size:15px}
     button.btn{padding:9px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600}
     button.primary{background:var(--primary); color:#fff}
-    button.ghost{background:#e9ecef}
+    button.ghost{background:#e9ecef'}
     button.warning{background:var(--danger); color:#fff}
     button.success{background:var(--success); color:#fff}
     #status{position:fixed; top:12px; right:12px; padding:8px 12px; border-radius:8px; color:#fff; font-weight:700; z-index:60}
@@ -209,7 +209,7 @@
     // QR scanner
     let html5QrCode = null;
     let scannerRunning = false;
-    let lastScan = { text: null, time: 0 };
+    let lastScan = { text: null, time: 0, tolerance: 600 };
 
     // Modal state
     let modalCurrentRowData = null;      // rowData عند الفتح من نتائج البحث
@@ -265,7 +265,6 @@
     function detectDuplicatesInSource(){
       duplicatesInSource = false;
       const seen = new Set();
-      // عادة يكون الصف 0 header؛ نبدأ من 1. لو الملف بدون header سيعرض نتائج من 1..n حيث سيتجاهل الصف 0 كـ header.
       for(let i = 1; i < rawExcel.length; i++){
         const row = rawExcel[i] || [];
         if(row.length === 0) continue;
@@ -518,26 +517,27 @@
     }
 
     /**************************************************************************
-     * قارئ QR: اختر الكاميرا الخلفية إن وُجدت، ونسخ القيمة لحقل البحث فقط
+     * قارئ QR المحسن لاختيار الكاميرا الخلفية بذكاء
+     * عند القراءه: **فقط** نملأ searchBar ولا ننفّذ البحث أو نمسح الحقل
      **************************************************************************/
     function chooseBackCamera(devices){
       if(!devices || devices.length === 0) return null;
-      // حاول إيجاد كاميرا ذات تسميات تشير للخلفية
+      // حاول إيجاد كاميرا ذات تسمية تشير إلى الخلفية
       const keywords = ["back","rear","env","environment","back camera","kamera belakang","الكاميرا الخلفية","خلفي","rear camera"];
       for(const d of devices){
         const label = (d.label || "").toLowerCase();
         for(const k of keywords){
-          if(label.includes(k)) return d.id || d.deviceId || (d.id??d.deviceId);
+          if(label.includes(k)) return d.id || d.deviceId || d.id ?? d.deviceId;
         }
       }
-      // إذا لم نجد، ختار آخر جهاز غالباً هو الخلفية
+      // إذا لم نجد كلمات، اختر آخر جهاز (غالباً الخلفية)
       if(devices.length > 1){
         const last = devices[devices.length - 1];
-        return last.id || last.deviceId || (last.id??last.deviceId);
+        return last.id || last.deviceId || last.id ?? last.deviceId;
       }
       // fallback: أول جهاز
       const first = devices[0];
-      return first.id || first.deviceId || (first.id??first.deviceId);
+      return first.id || first.deviceId || first.id ?? first.deviceId;
     }
 
     async function startScanner(){
@@ -559,7 +559,7 @@
       cameraBtn.textContent = '⏹ إيقاف الكاميرا';
       try{
         html5QrCode = new Html5Qrcode("reader");
-        const devices = await Html5Qrcode.getCameras();
+        const devices = await Html5Qrcode.getCameras(); // array of {id, label}
         const chosenId = chooseBackCamera(devices);
         const cameraConfig = chosenId ? { deviceId: { exact: chosenId } } : { facingMode: "environment" };
 
@@ -568,28 +568,20 @@
           { fps: 10, qrbox: 250 },
           (decodedText, decodedResult) => {
             const now = Date.now();
-            if(decodedText === lastScan.text && (now - lastScan.time) < 600){
+            if(decodedText === lastScan.text && (now - lastScan.time) < lastScan.tolerance){
               lastScan.time = now;
               return;
             }
             lastScan.text = decodedText;
             lastScan.time = now;
-            // فقط ننسخ النص لحقل البحث ولا نبحث أو نضيف
+            // فقط ننسخ النص لحقل البحث ولا نبحث أو نضيف أو نمسح الحقل
             searchBar.value = decodedText;
-            searchBar.focus();
-            // نوقف الماسح ليرجع القرار للمستخدم
-            if(html5QrCode){
-              html5QrCode.stop().then(()=>{
-                try{ html5QrCode.clear(); } catch(e){}
-                html5QrCode = null;
-                readerEl.style.display = 'none';
-                cameraBtn.textContent = '📷 تشغيل الكاميرا';
-                scannerRunning = false;
-              }).catch(()=>{ /* ignore */ });
-            }
+            try{ searchBar.focus(); } catch(e){}
+            // لا نقوم بعمل search() تلقائيًا ولا أي تفريغ للحقل
+            // نترك المستخدم يقرر الضغط على زر البحث يدوياً
           },
           (errorMessage) => {
-            // ignore frame errors
+            // تجاهل أخطاء الفريمات الصغيرة
           }
         );
         scannerRunning = true;
@@ -637,7 +629,6 @@
         if(idx !== null){
           openReceiveModalFromResults(idx);
         } else {
-          // fallback: build row from cells
           const name = (tr.cells[0] && tr.cells[0].textContent) || "";
           const code = (tr.cells[1] && tr.cells[1].textContent) || "";
           const qr = (tr.cells[3] && tr.cells[3].textContent) || "";
@@ -691,10 +682,9 @@
     });
 
     /**************************************************************************
-     * وظائف مساعدة أخيرة
+     * وظائف مساعدة أخيرة (مكرر بشكل واضح لتجنب الاعتمادية)
      **************************************************************************/
     function tryLoadExcel(list){
-      // wrapper فوق الدالة المعرفة سابقًا لتجنب الاعتراضات
       let idx = 0;
       function attempt(){
         if(idx >= list.length){
