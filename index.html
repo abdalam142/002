@@ -3,159 +3,264 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>استلام منتجات</title>
+  <title>بحث في المنتجات</title>
 
   <!-- مكتبات -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>
 
   <style>
-    :root{
-      --card-bg:#ffffff;
-      --muted:#6c757d;
-      --primary:#0d6efd;
-      --success:#28a745;
-      --danger:#dc3545;
-      --accent:#20c997;
+    :root {
+      --card-bg: #ffffff;
+      --muted: #6c757d;
+      --primary: #0d6efd;
+      --success: #28a745;
+      --danger: #dc3545;
+      --accent: #20c997;
     }
-    body{
-      font-family:Arial, sans-serif;
-      background:#f6f7fb;
-      color:#222;
-      margin:0;
-      padding:18px;
-      box-sizing:border-box;
-      direction:rtl;
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f7fb;
+      color: #222;
+      margin: 0;
+      padding: 18px;
+      box-sizing: border-box;
+      direction: rtl;
     }
-    h2{ text-align:center; margin:6px 0 12px; }
+    h2 { text-align: center; margin: 6px 0 12px; }
 
-    /* حالة ملف الإكسل */
-    #status{
-      position:fixed; top:12px; right:12px;
-      padding:8px 12px; border-radius:6px; color:#fff; font-weight:700; z-index:60;
+    /* مؤشر حالة ملف الإكسل */
+    #status {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: #fff;
+      font-weight: 700;
+      z-index: 60;
     }
-    #status.active{ background:var(--success); }
-    #status.inactive{ background:var(--danger); }
+    #status.active { background: var(--success); }
+    #status.inactive { background: var(--danger); }
 
-    .searchRow{ text-align:center; margin-bottom:12px; position:relative; }
-    #searchBar{
-      width:60%; max-width:520px; padding:10px; font-size:16px; border-radius:8px; border:1px solid #ddd; box-sizing:border-box; display:inline-block;
-    }
-    .btn{
-      padding:10px 14px; margin:0 6px; border-radius:8px; border:none; cursor:pointer; font-size:15px; height:40px; line-height:18px;
-    }
-    .btn.primary{ background:var(--primary); color:#fff; }
-    .btn.ghost{ background:#e9ecef; }
-    .btn.camera{ background:var(--accent); color:#fff; display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; padding:0; border-radius:10px; }
-
-    /* قارئ QR - مربع صغير جداً (حوالي ضعف زر الكاميرا) */
-    #reader{
-      width:88px; height:88px; position:fixed; top:12px; left:12px; right:auto;
-      display:none; z-index:9999; background:#000; border-radius:8px; padding:2px; box-shadow:0 2px 10px rgba(0,0,0,0.12); overflow:hidden;
-    }
-    /* إجبار أحجام عناصر html5-qrcode الداخلية لتبقى صغيرة */
-    #reader, #reader .html5-qrcode, #reader .html5-qrcode-element, #reader .html5-qrcode-region {
-      width:100% !important; height:100% !important; max-width:88px !important; max-height:88px !important;
-    }
-    #reader video, #reader canvas, #reader .html5-qrcode-video {
-      width:100% !important; height:100% !important; object-fit:cover !important; display:block !important;
-    }
-    /* إخفاء عناصر تحكم زائدة من المكتبة */
-    #reader .html5-qrcode-button-camera, #reader .html5-qrcode-status, #reader .html5-qrcode-dashboard {
-      display:none !important;
+    /* التطبيق يظهر فوراً */
+    #app {
+      display: block; /* تم إظهار التطبيق مباشرة بدون شاشة باسورد */
+      margin-top: 14px;
     }
 
-    .tables{
-      display:flex; gap:18px; justify-content:space-between; align-items:flex-start; margin-top:16px; flex-wrap:wrap;
+    .searchRow {
+      text-align: center;
+      margin-bottom: 12px;
     }
-    .col{
-      width:48%; background:var(--card-bg); padding:12px; border-radius:8px; box-shadow:0 1px 6px rgba(0,0,0,0.04); box-sizing:border-box;
+    #searchBar {
+      width: 60%;
+      max-width: 520px;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+      display: inline-block;
+    }
+    .btn {
+      padding: 10px 14px;
+      margin: 0 6px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .btn.primary { background: var(--primary); color: #fff; }
+    .btn.ghost { background: #e9ecef; }
+    .btn.camera { background: var(--accent); color: #fff; }
+
+    /* زر الكاميرا صغير مربع */
+    #cameraBtn {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border-radius: 8px;
+      font-size: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn.scale-active { background: #ffc107; color: #111; }
+
+    /* قارئ QR صغير مربع */
+    #reader {
+      width: 88px;
+      height: 88px;
+      margin: 10px;
+      display: none;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      background: #000;
+      z-index: 80;
+    }
+    /* نجبر عناصر المكتبة على ملء الحاوية الصغيرة */
+    #reader video, #reader canvas, #reader .html5-qrcode-viewport, #reader .html5-qrcode-scanner {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+    /* إخفاء عناصر dashboard/controls الإضافية من المكتبة إذا أضافتها */
+    #reader .html5-qrcode-button, #reader .html5-qrcode-status, #reader .html5-qrcode-button-svg {
+      display: none !important;
     }
 
-    table{ width:100%; border-collapse:collapse; table-layout:fixed; word-wrap:break-word; }
-    thead th{ background:#f2f2f2; padding:8px; border:1px solid #ddd; font-weight:600; }
-    tbody td{ padding:8px; border:1px solid #ddd; text-align:center; vertical-align:middle; }
-
-    table th:nth-child(1), table td:nth-child(1){ width:40%; } /* اسم المنتج */
-    table th:nth-child(2), table td:nth-child(2){ width:18%; } /* كود الميزان */
-    table th:nth-child(3), table td:nth-child(3){ width:18%; } /* QR */
-    table th:nth-child(4), table td:nth-child(4){ width:12%; } /* كمية */
-    table th:nth-child(5), table td:nth-child(5){ width:12%; } /* إجراء */
-
-    .addBtn{ background:#198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-    .delBtn{ background:var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-    .moveBtn{ background:var(--primary); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-    #clearAllBtn{ background:var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
-
-    .no-value{ background:#ffe5e5 !important; }
-
-    .modal-overlay{
-      position:fixed; inset:0; background:rgba(0,0,0,0.35); display:none; z-index:200; align-items:center; justify-content:center;
+    .tables {
+      display: flex;
+      gap: 18px;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-top: 16px;
+      flex-wrap: wrap;
     }
-    .modal{ background:#fff; border-radius:10px; padding:14px; width:320px; box-shadow:0 4px 20px rgba(0,0,0,0.2); text-align:center; }
-    .num-input{ width:100%; padding:10px; font-size:20px; border-radius:6px; border:1px solid #ddd; text-align:center; margin-bottom:8px; }
-    .modal .numpad{ width:100%; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:8px 0; }
-    .small-note{ font-size:12px; color:var(--muted); margin-top:6px; }
+    .col {
+      width: 48%;
+      background: var(--card-bg);
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+      box-sizing: border-box;
+    }
 
-    .old-value-badge{ font-size:12px; color:#fff; background:#6c757d; padding:2px 6px; border-radius:6px; margin-right:6px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      word-wrap: break-word;
+    }
+    thead th {
+      background: #f2f2f2;
+      padding: 8px;
+      border: 1px solid #ddd;
+      font-weight: 600;
+    }
+    tbody td {
+      padding: 8px;
+      border: 1px solid #ddd;
+      text-align: center;
+      vertical-align: middle;
+    }
 
-    @media (max-width:900px){
-      .tables{ flex-direction:column; }
-      .col{ width:100%; }
-      #reader{ left:12px; top:12px; width:88px; height:88px; }
-      #searchBar{ width:85%; }
+    /* أعمدة بعرض ثابت (نسب) */
+    table th:nth-child(1), table td:nth-child(1) { width: 30%; }
+    table th:nth-child(2), table td:nth-child(2) { width: 18%; }
+    table th:nth-child(3), table td:nth-child(3) { width: 18%; }
+    table th:nth-child(4), table td:nth-child(4) { width: 14%; }
+    table th:nth-child(5), table td:nth-child(5) { width: 20%; }
+
+    .addBtn { background: #198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    .delBtn { background: var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    #clearAllBtn { background: var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
+
+    .muted { color: var(--muted); font-size: 13px; }
+
+    .flash { background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 6px; display: inline-block; }
+
+    /* Modal for quantity */
+    #modalOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    #modal {
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 10px;
+      width: 320px;
+      max-width: 92%;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      text-align: center;
+    }
+    #modal h4 { margin: 0 0 8px 0; }
+    #modal input[type="number"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 18px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    #modal .modal-actions { margin-top: 10px; display:flex; gap:8px; justify-content:center; }
+    #modal .modal-actions button { padding: 8px 12px; border-radius:8px; border:none; cursor:pointer; }
+    #modal .confirm { background: var(--primary); color:#fff; }
+    #modal .cancel { background: #e9ecef; }
+
+    .no-value { opacity: 0.6; }
+
+    @media (max-width: 900px) {
+      .tables { flex-direction: column; }
+      .col { width: 100%; }
+      #reader { width: 88px; }
+      #searchBar { width: 85%; }
     }
   </style>
 </head>
 <body>
-  <h2>استلام منتجات</h2>
+  <h2>بحث في المنتجات</h2>
 
+  <!-- مؤشر حالة ملف الإكسل -->
   <div id="status" class="inactive">لا يوجد ملف فعال</div>
 
+  <!-- التطبيق يظهر فوراً -->
   <div id="app">
     <div class="searchRow" role="region" aria-label="شريط البحث">
       <input id="searchBar" type="text" placeholder="اكتب الاسم أو الباركود أو وصف المنتج" aria-label="بحث">
-      <button id="searchBtn" class="btn primary" title="بحث">بحث</button>
-      <button id="clearBtn" class="btn ghost" title="حذف">حذف</button>
-      <button id="cameraBtn" class="btn camera" title="كاميرا">📷</button>
-      <button id="moveAllBtn" class="btn" style="background:#0b5ed7;color:#fff;" title="نقل كل المنتجات">نقل كل</button>
+      <button id="searchBtn" class="btn primary">بحث</button>
+      <button id="clearBtn" class="btn ghost">حذف</button>
+      <button id="cameraBtn" class="btn camera" title="فتح الكاميرا">📷</button>
+      <button id="scaleBtn" class="btn camera">📶 كود الميزان</button>
     </div>
 
+    <!-- قارئ QR صغير يظهر هنا -->
     <div id="reader" aria-hidden="true"></div>
 
     <div class="tables">
-      <div class="col" aria-label="سجل الاستلام">
-        <h3>سجل الاستلام (التسجيل)</h3>
-        <div style="text-align:left; margin-bottom:6px;">
-          <button id="clearAllBtn" onclick="clearAllCompleted()" style="display:none;">حذف الكل</button>
-        </div>
+      <!-- جدول نتائج البحث (يمين) -->
+      <div class="col" aria-label="نتائج البحث">
+        <h3>سجل الاستلام (نتائج البحث)</h3>
         <table id="results" aria-live="polite">
           <thead>
             <tr>
               <th>اسم المنتج</th>
+              <th>سعر المنتج</th>
               <th>كود الميزان</th>
-              <th>QR Code</th>
-              <th>الكمية (كجم)</th>
+              <th>الكمية</th>
               <th>إجراء</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
+        <div style="margin-top:8px; text-align:left;">
+          <button id="moveAllBtn" class="btn primary" style="display:inline-block;">نقل الكل</button>
+        </div>
       </div>
 
-      <div class="col" aria-label="المكتمل">
+      <!-- جدول المنتجات المختارة (شمال) -->
+      <div class="col" aria-label="المنتجات المختارة">
         <h3>المنتجات المكتملة</h3>
         <div style="text-align:left; margin-bottom:6px;">
-          <button id="exportBtn" class="btn primary" onclick="exportCompleted()">حفظ/تصدير (Excel)</button>
-          <button id="deleteAllCompleted" class="btn ghost" onclick="clearCompleted()">حذف الكل</button>
+          <button id="clearAllBtn" onclick="clearAllSelected()">حذف الكل</button>
+          <button id="exportBtn" class="btn primary" style="margin-left:8px;">تصدير Excel</button>
         </div>
         <table id="finalResults" aria-live="polite">
           <thead>
             <tr>
               <th>اسم المنتج</th>
+              <th>سعر المنتج</th>
               <th>كود الميزان</th>
-              <th>QR Code</th>
-              <th>الكمية (كجم)</th>
+              <th>الكمية</th>
               <th>إجراء</th>
             </tr>
           </thead>
@@ -165,32 +270,31 @@
     </div>
   </div>
 
-  <div id="modalOverlay" class="modal-overlay" role="dialog" aria-modal="true">
-    <div class="modal" role="document">
-      <h4 id="modalTitle">ادخل الكمية / الوزن (كجم)</h4>
-      <input id="modalInput" class="num-input" type="text" inputmode="decimal" placeholder="مثال: 1.25" />
-      <div class="numpad" id="modalNumpad">
-        <button onclick="modalDigit('1')">1</button><button onclick="modalDigit('2')">2</button><button onclick="modalDigit('3')">3</button>
-        <button onclick="modalDigit('4')">4</button><button onclick="modalDigit('5')">5</button><button onclick="modalDigit('6')">6</button>
-        <button onclick="modalDigit('7')">7</button><button onclick="modalDigit('8')">8</button><button onclick="modalDigit('9')">9</button>
-        <button onclick="modalBack()">⌫</button><button onclick="modalDigit('0')">0</button><button onclick="modalDot()">.</button>
+  <!-- Modal لإدخال الكمية -->
+  <div id="modalOverlay" aria-hidden="true">
+    <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h4 id="modalTitle">أدخل الكمية (كجم)</h4>
+      <input id="modalInput" type="number" min="0" step="0.001" placeholder="مثال: 0.250">
+      <div style="margin-top:8px; font-size:13px; color:var(--muted);" id="modalNote">اضغط تأكيد لحفظ الكمية</div>
+      <div class="modal-actions">
+        <button id="confirmModal" class="confirm">تأكيد</button>
+        <button id="cancelModal" class="cancel">إلغاء</button>
       </div>
-      <div style="margin-top:10px;">
-        <button class="btn primary" onclick="confirmModal()">تم</button>
-        <button class="btn ghost" onclick="cancelModal()">إلغاء</button>
-      </div>
-      <div class="small-note">القيمة تُخزّن وتعرض دائماً بالكيلو جرام (كجم)</div>
     </div>
   </div>
 
-  <div id="oldValuePopup" style="position:fixed; display:none; z-index:220; background:#333; color:#fff; padding:6px 8px; border-radius:6px; font-size:13px;"></div>
-
   <script>
-    let excelData = [];
-    let qrScanner = null;
-    let scanningMode = null;
+    /**************************************************************************
+     * متغيرات عامة جديدة بعد حذف شاشة الباسورد ونسخ الكود
+     **************************************************************************/
+    let excelData = [];        // بيانات الإكسل كـ array of arrays
+    let qrScanner = null;      // مثيل html5-qrcode
+    let scanningMode = null;   // 'qr' أو null
+    let scaleFilterActive = false;
     let lastScan = { text: null, time: 0 };
+    const SCAN_DEBOUNCE_MS = 1000;
 
+    /* عناصر DOM الرئيسية */
     const statusEl = document.getElementById('status');
     const app = document.getElementById('app');
 
@@ -198,20 +302,24 @@
     const resultsTbody = document.querySelector('#results tbody');
     const finalTbody = document.querySelector('#finalResults tbody');
     const reader = document.getElementById('reader');
-    const cameraBtn = document.getElementById('cameraBtn');
+    const clearAllBtnEl = document.getElementById('clearAllBtn');
+    const scaleBtnEl = document.getElementById('scaleBtn');
+    const cameraBtnEl = document.getElementById('cameraBtn');
 
     const modalOverlay = document.getElementById('modalOverlay');
     const modalInput = document.getElementById('modalInput');
-    const oldValuePopup = document.getElementById('oldValuePopup');
+    const confirmModalBtn = document.getElementById('confirmModal');
+    const cancelModalBtn = document.getElementById('cancelModal');
 
-    let pendingRowForValue = null;
+    const moveAllBtn = document.getElementById('moveAllBtn');
+    const exportBtn = document.getElementById('exportBtn');
 
-    const sourceXlsxName = "product.template(176).xlsx";
+    const headers = ["اسم المنتج", "سعر المنتج", "كود الميزان", "QR Code", "الكمية"];
 
-    app.style.display = 'block';
-
-    // Load Excel template if available
-    fetch(sourceXlsxName)
+    /**************************************************************************
+     * تحميل ملف الإكسل
+     **************************************************************************/
+    fetch("product.template(176).xlsx")
       .then(res => res.arrayBuffer())
       .then(data => {
         try {
@@ -232,80 +340,122 @@
         statusEl.className = "inactive";
       });
 
-    /* ---------- Search: show matches in results table; user selects and clicks "استلام" ---------- */
+    /**************************************************************************
+     * دوال مساعدة
+     **************************************************************************/
+    function escapeHtml(str) {
+      if (typeof str !== 'string') return str;
+      return str.replace(/[&<>"'`=\/]/g, function(s) {
+        return ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+          '/': '&#x2F;',
+          '=': '&#x3D;',
+          '`': '&#x60;'
+        })[s];
+      });
+    }
+
+    function flashRowMessage(row, msg) {
+      const cell = document.createElement('td');
+      cell.colSpan = row.children.length || 5;
+      cell.className = 'flash';
+      cell.textContent = msg;
+      // أضف صف مؤقت
+      const tr = document.createElement('tr');
+      tr.appendChild(cell);
+      row.parentElement.insertBefore(tr, row.nextSibling);
+      setTimeout(() => tr.remove(), 1200);
+    }
+
+    /**************************************************************************
+     * البحث: يعرض النتائج في جدول "سجل الاستلام" (results)
+     * - fromScanner: لو البحث جاء من الماسح الضوئي
+     * - value: القيمة الممسوحة (لو من الماسح)
+     * يعيد مصفوفة من الكائنات المطابقة (مع رقم الصف الأصلي idx)
+     **************************************************************************/
     function search(fromScanner = false, value = '') {
-      const query = fromScanner ? (String(value || "")).trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
+      const query = fromScanner ? (value + "").trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
       if (!query) {
-        if (fromScanner) { searchBar.value = ""; searchBar.dispatchEvent(new Event('input')); }
-        return;
+        if (fromScanner) {
+          searchBar.value = "";
+          searchBar.dispatchEvent(new Event('input'));
+        }
+        return [];
       }
-      if (!Array.isArray(excelData) || excelData.length === 0) return;
+      if (!Array.isArray(excelData) || excelData.length === 0) return [];
 
       resultsTbody.innerHTML = "";
+      const matches = [];
 
       excelData.forEach((row, idx) => {
-        if (idx === 0) return; // header
+        if (idx === 0) return; // تخطي الهيدر
         const name = (row[0] || "").toString();
         const price = (row[1] || "").toString();
-        const scaleCode = (row[2] || "").toString();
+        const code = (row[2] || "").toString();
         const qr = (row[3] || "").toString();
 
         const a = name.toLowerCase();
-        const c = scaleCode.toLowerCase();
+        const c = code.toLowerCase();
         const d = qr.toLowerCase();
 
         if (a.includes(query) || c.includes(query) || d.includes(query)) {
-          // prevent duplicates in results table
-          const exists = Array.from(resultsTbody.rows).some(r => {
-            const rQr = (r.cells[2] && r.cells[2].textContent) || "";
-            const rCode = (r.cells[1] && r.cells[1].textContent) || "";
-            return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
-          });
-          if (exists) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${escapeHtml(name)}</td><td>${escapeHtml(scaleCode)}</td><td>${escapeHtml(qr)}</td><td></td><td>مكرر</td>`;
-            resultsTbody.appendChild(tr);
-            return;
-          }
-
           const tr = document.createElement('tr');
-          const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
-          const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
-          const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
 
-          const tdQty = document.createElement('td'); tdQty.textContent = ''; tr.appendChild(tdQty);
+          const td0 = document.createElement('td'); td0.textContent = name; tr.appendChild(td0);
+          const td1 = document.createElement('td'); td1.textContent = price; tr.appendChild(td1);
+          const td2 = document.createElement('td'); td2.textContent = code; tr.appendChild(td2);
+          const tdQty = document.createElement('td'); tdQty.textContent = ""; tdQty.className = "no-value"; tr.appendChild(tdQty);
+
           const tdAction = document.createElement('td');
 
+          // زر استلام لفتح modal إدخال الكمية
           const receiveBtn = document.createElement('button');
           receiveBtn.className = 'addBtn';
           receiveBtn.textContent = 'استلام';
-          receiveBtn.addEventListener('click', () => openQuantityModal(tr));
+          receiveBtn.addEventListener('click', () => {
+            openQtyModalForRow(tr, { name, price, code, qr, rowIndex: idx });
+          });
           tdAction.appendChild(receiveBtn);
 
+          // زر نقل (معطل مبدئياً)
           const moveBtn = document.createElement('button');
-          moveBtn.className = 'moveBtn';
-          moveBtn.style.marginRight = '6px';
+          moveBtn.className = 'btn ghost';
           moveBtn.textContent = 'نقل';
-          moveBtn.addEventListener('click', () => moveRowToCompleted(tr));
+          moveBtn.disabled = true;
+          moveBtn.style.marginLeft = '6px';
+          moveBtn.addEventListener('click', () => {
+            moveRowToCompleted(tr);
+          });
           tdAction.appendChild(moveBtn);
-
-          const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'delBtn';
-          deleteBtn.style.marginRight = '6px';
-          deleteBtn.textContent = 'حذف';
-          deleteBtn.addEventListener('click', () => { tr.remove(); checkClearAllVisibility(); });
-          tdAction.appendChild(deleteBtn);
 
           tr.appendChild(tdAction);
           resultsTbody.appendChild(tr);
 
-          // Only scanner exact-match opens modal automatically
-          const exactMatch = ((d && d === query) || (c && c === query));
-          if (fromScanner && exactMatch) openQuantityModal(tr);
+          // انضمام للمطابقات لتسهيل التعامل لاحقاً
+          matches.push({ tr, data: { name, price, code, qr, rowIndex: idx }, moveBtn, tdQty });
+
+          // إذا كان تطابقًا دقيقًا (qr أو code) ومن مصدر الماسح: افتح modal فوراً
+          const exactMatch = fromScanner && ((d && d === query) || (c && c === query));
+          if (exactMatch) {
+            // نفتح modal على هذا الصف مباشرة
+            setTimeout(() => openQtyModalForRow(tr, { name, price, code, qr, rowIndex: idx }), 80);
+          }
         }
       });
 
-      if (fromScanner) { searchBar.value = ""; searchBar.dispatchEvent(new Event('input')); }
+      if (scaleFilterActive) applyScaleFilterToTable(resultsTbody);
+
+      // لو جاء من الماسح نضمن التفريغ النهائي للحقل
+      if (fromScanner) {
+        searchBar.value = "";
+        searchBar.dispatchEvent(new Event('input'));
+      }
+
+      return matches;
     }
 
     function clearSearch() {
@@ -313,126 +463,115 @@
       resultsTbody.innerHTML = "";
     }
 
-    /* ---------- Quantity modal ---------- */
-    function openQuantityModal(row) {
-      if (modalOverlay.style.display === 'flex') return;
-      pendingRowForValue = { rowEl: row };
-      modalInput.value = '';
-      modalOverlay.style.display = 'flex';
-      modalInput.focus();
-    }
-    function closeModal() { modalOverlay.style.display = 'none'; pendingRowForValue = null; }
-    function modalDigit(d) { modalInput.value = (modalInput.value || "") + d; }
-    function modalDot() { if (!modalInput.value.includes('.')) modalInput.value = (modalInput.value || "") + '.'; }
-    function modalBack() { modalInput.value = (modalInput.value || "").slice(0, -1); }
-
-    function confirmModal() {
-      const raw = (modalInput.value || "").trim();
-      const val = parseFloat(raw);
-      if (!raw || isNaN(val) || val <= 0) {
-        alert("لم يتم إدخال قيمة صالحة. الرجاء إدخال قيمة كمية بالكيلوغرام أكبر من صفر.");
-        modalInput.focus();
-        return;
-      }
-      if (!pendingRowForValue || !pendingRowForValue.rowEl) { closeModal(); return; }
-      const tr = pendingRowForValue.rowEl;
-      const qtyCell = tr.cells[3];
-      const oldVal = qtyCell.getAttribute('data-qty') || '';
-      if (oldVal) showOldValueBadge(tr, oldVal);
-      qtyCell.textContent = val.toString() + ' كجم';
-      qtyCell.setAttribute('data-qty', String(val));
-      const actionCell = tr.cells[4];
-      const btns = actionCell.querySelectorAll('button');
-      btns.forEach(b => b.style.display = '');
-      tr.classList.remove('no-value');
-      closeModal();
-    }
-
-    function cancelModal() {
-      if (pendingRowForValue && pendingRowForValue.rowEl) {
-        const tr = pendingRowForValue.rowEl;
-        const qtyCell = tr.cells[3];
-        const existing = qtyCell.getAttribute('data-qty') || '';
-        if (!existing) {
-          tr.classList.add('no-value');
-          const actionCell = tr.cells[4];
-          const btns = actionCell.querySelectorAll('button');
-          btns.forEach(b => { if (b.classList.contains('addBtn')) b.style.display = 'none'; });
-        }
-      }
-      closeModal();
-    }
-
-    function showOldValueBadge(row, oldVal) {
-      const cell = row.cells[3];
-      const rect = cell.getBoundingClientRect();
-      oldValuePopup.textContent = 'القيمة القديمة: ' + oldVal + ' كجم';
-      oldValuePopup.style.top = (rect.top - 36) + 'px';
-      oldValuePopup.style.left = (rect.left - 10) + 'px';
-      oldValuePopup.style.display = 'block';
-      setTimeout(() => { oldValuePopup.style.display = 'none'; }, 1800);
-    }
-
-    /* ---------- Move to completed ---------- */
-    function moveRowToCompleted(row) {
-      const qtyCell = row.cells[3];
-      const qty = parseFloat(qtyCell.getAttribute('data-qty') || '');
-      if (!qty || isNaN(qty) || qty <= 0) { alert('لا يمكن نقل عنصر بدون قيمة. الرجاء إدخال كمية/وزن أولاً.'); return; }
-
-      const name = (row.cells[0] && row.cells[0].textContent) || '';
-      const scaleCode = (row.cells[1] && row.cells[1].textContent) || '';
-      const qr = (row.cells[2] && row.cells[2].textContent) || '';
-
-      const existsLeft = Array.from(finalTbody.rows).some(r => {
-        const rQr = (r.cells[2] && r.cells[2].textContent) || "";
-        const rCode = (r.cells[1] && r.cells[1].textContent) || "";
-        return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
-      });
-      if (existsLeft) { alert('العنصر موجود مسبقاً في جدول المنتجات المكتملة. النقل مرفوض.'); return; }
-
-      const tr = document.createElement('tr');
-      const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
-      const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
-      const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
-      const td3 = document.createElement('td'); td3.textContent = qty + ' كجم'; td3.setAttribute('data-qty', String(qty)); tr.appendChild(td3);
-
-      const tdAction = document.createElement('td');
-      const delBtn = document.createElement('button'); delBtn.className = 'delBtn'; delBtn.textContent = 'حذف';
-      delBtn.addEventListener('click', function(){ this.closest('tr').remove(); checkClearAllVisibility(); });
-      tdAction.appendChild(delBtn);
-      tr.appendChild(tdAction);
-
-      finalTbody.appendChild(tr);
-      row.remove();
+    /**************************************************************************
+     * فلتر كود الميزان
+     **************************************************************************/
+    function toggleScaleFilter() {
+      scaleFilterActive = !scaleFilterActive;
+      scaleBtnEl.classList.toggle('scale-active', scaleFilterActive);
+      applyScaleFilterToTable(resultsTbody);
+      applyScaleFilterToTable(finalTbody);
       checkClearAllVisibility();
     }
 
-    function moveAllToCompleted() {
-      const rows = Array.from(resultsTbody.rows);
-      let movedAny = false;
-      for (const row of rows) {
-        const qtyCell = row.cells[3];
-        const qty = parseFloat(qtyCell.getAttribute('data-qty') || '');
-        if (qty && !isNaN(qty) && qty > 0) {
-          const name = (row.cells[0] && row.cells[0].textContent) || '';
-          const scaleCode = (row.cells[1] && row.cells[1].textContent) || '';
-          const qr = (row.cells[2] && row.cells[2].textContent) || '';
+    function applyScaleFilterToTable(tbody) {
+      if (!tbody) return;
+      const rows = Array.from(tbody.rows);
+      rows.forEach(row => {
+        const cell = row.cells[2]; // كود الميزان (index 2)
+        const val = cell ? (cell.textContent || "").trim() : "";
+        row.style.display = (scaleFilterActive && val === "") ? 'none' : '';
+      });
+    }
 
-          const existsLeft = Array.from(finalTbody.rows).some(r => {
-            const rQr = (r.cells[2] && r.cells[2].textContent) || "";
-            const rCode = (r.cells[1] && r.cells[1].textContent) || "";
-            return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
-          });
-          if (!existsLeft) {
-            const tr = document.createElement('tr');
-            const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
-            const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
-            const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
-            const td3 = document.createElement('td'); td3.textContent = qty + ' كجم'; td3.setAttribute('data-qty', String(qty)); tr.appendChild(td3);
-            const tdAction = document.createElement('td');
-            const delBtn = document.createElement('button'); delBtn.className = 'delBtn'; delBtn.textContent = 'حذف';
-            delBtn.addEventListener('click', function(){ this.closest('tr').remove(); checkClearAllVisibility(); });
-            tdAction.appendChild(delBtn);
-            tr.appendChild(tdAction);
-            finalTbody.appendChild(tr);
-            row.remove();
+    /**************************************************************************
+     * إدارة modal إدخال الكمية
+     * - فتح modal مرتبط بصف من جدول النتائج
+     * - تخزين القيمة في td (data-qty) وعرضها كـ "X كجم"
+     * - تفعيل زر "نقل" عندما توجد قيمة صحيحة
+     **************************************************************************/
+    let currentModalRow = null;
+    let currentModalData = null;
+
+    function openQtyModalForRow(rowElement, dataObj) {
+      currentModalRow = rowElement;
+      currentModalData = dataObj;
+      modalOverlay.style.display = 'flex';
+      modalOverlay.setAttribute('aria-hidden', 'false');
+
+      // إذا كانت هناك قيمة موجودة مسبقاً في الخلية
+      const qtyCell = rowElement.cells[3];
+      const existing = (qtyCell && qtyCell.dataset && qtyCell.dataset.qty) ? qtyCell.dataset.qty : '';
+      modalInput.value = existing || '';
+      setTimeout(() => modalInput.focus(), 80);
+    }
+
+    function closeModal() {
+      modalOverlay.style.display = 'none';
+      modalOverlay.setAttribute('aria-hidden', 'true');
+      currentModalRow = null;
+      currentModalData = null;
+      modalInput.value = '';
+    }
+
+    confirmModalBtn.addEventListener('click', () => {
+      if (!currentModalRow) { closeModal(); return; }
+      const v = modalInput.value;
+      const num = parseFloat(v);
+      const qtyCell = currentModalRow.cells[3];
+      if (!v || isNaN(num) || num <= 0) {
+        // وضع وسم no-value وإخفاء زر النقل
+        qtyCell.textContent = "";
+        qtyCell.classList.add('no-value');
+        const moveBtn = getMoveButtonFromRow(currentModalRow);
+        if (moveBtn) { moveBtn.disabled = true; }
+        // لو المستخدم ألغى أو أدخل قيمة غير صحيحة، نصيحة قصيرة ثم اغلاق
+        closeModal();
+        return;
+      }
+
+      // تحقق من التكرار في جدول النتائج أو المكتمل (نقوم بمنع إضافة نفس qr أو code)
+      const codeVal = (currentModalData.code || "") + "";
+      const qrVal = (currentModalData.qr || "") + "";
+
+      // نمنع تكرار القيمة في finalResults حسب الكود أو QR
+      const existsInFinal = Array.from(finalTbody.rows).some(r => {
+        const rCode = (r.cells[2] && r.cells[2].textContent) || "";
+        const rQty = (r.cells[3] && r.cells[3].dataset && r.cells[3].dataset.qty) || "";
+        return (rCode === codeVal && codeVal !== "");
+      });
+      if (existsInFinal) {
+        flashRowMessage(currentModalRow, 'مكرر في المكتمل');
+        closeModal();
+        return;
+      }
+
+      // حفظ القيمة في الخلية كـ data-qty ونص مرئي
+      qtyCell.dataset.qty = String(num);
+      qtyCell.textContent = num + " كجم";
+      qtyCell.classList.remove('no-value');
+
+      // إظهار badge مؤقت للقيمة القديمة يمكن إضافته لاحقًا (لم نقم بتتبع القيمة القديمة هنا بعرض منفصل)
+      const moveBtn = getMoveButtonFromRow(currentModalRow);
+      if (moveBtn) { moveBtn.disabled = false; }
+
+      closeModal();
+    });
+
+    cancelModalBtn.addEventListener('click', () => {
+      closeModal();
+    });
+
+    function getMoveButtonFromRow(tr) {
+      if (!tr) return null;
+      const actionCell = tr.cells[tr.cells.length - 1];
+      if (!actionCell) return null;
+      const buttons = actionCell.querySelectorAll('button');
+      // افتراض أن الزر الثاني هو moveBtn كما بُني سابقاً
+      return buttons && buttons[1] ? buttons[1] : null;
+    }
+
+    /**************************************************************************
+     * نقل الصف إلى finalResults
+     * - يتأكد أن هناك qty صالح
+     * - يمنع التكرار في fin
