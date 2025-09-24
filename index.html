@@ -2,267 +2,660 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <title>بحث المنتجات</title>
+  <!-- إجبار عرض desktop على الموبايل كما طلبت -->
   <meta name="viewport" content="width=1024" />
+  <title>بحث واستلام منتجات (من ملف Excel)</title>
+
+  <!-- مكتبات -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>
+
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      direction: rtl;
-      margin: 20px;
+    :root{
+      --bg:#f6f7fb;
+      --card:#fff;
+      --muted:#6c757d;
+      --primary:#0d6efd;
+      --danger:#dc3545;
+      --success:#198754;
     }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 10px;
+    html,body{height:100%; margin:0; background:var(--bg); font-family:Arial, sans-serif; direction:rtl}
+    .wrap{max-width:1100px; margin:18px auto; padding:16px;}
+    header{display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:12px}
+    header h1{font-size:20px; margin:0;}
+    .controls{display:flex; gap:8px; align-items:center}
+    input[type="text"]{padding:10px 12px; border-radius:8px; border:1px solid #ddd; width:420px; font-size:15px}
+    button.btn{padding:9px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600}
+    button.primary{background:var(--primary); color:#fff}
+    button.ghost{background:#e9ecef}
+    button.warning{background:var(--danger); color:#fff}
+    button.success{background:var(--success); color:#fff}
+    #status{position:fixed; top:12px; right:12px; padding:8px 12px; border-radius:8px; color:#fff; font-weight:700; z-index:60}
+    #status.inactive{background:var(--danger)}
+    #status.active{background:var(--success)}
+    .main{display:flex; gap:18px; align-items:flex-start; margin-top:8px; flex-wrap:wrap}
+    .col{background:var(--card); padding:12px; border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.05); box-sizing:border-box}
+    .col.half{width:48%}
+    .col.full{width:100%}
+    h3{margin:0 0 8px 0; font-size:16px}
+    table{width:100%; border-collapse:collapse; table-layout:fixed; word-wrap:break-word}
+    thead th{background:#f2f2f2; padding:8px; border:1px solid #e0e0e0; font-weight:700}
+    tbody td{padding:8px; border:1px solid #e6e6e6; text-align:center; vertical-align:middle}
+    .small{padding:6px 8px; border-radius:6px; cursor:pointer}
+    .addBtn{background:var(--success); color:#fff; border:none}
+    .delBtn{background:var(--danger); color:#fff; border:none}
+    .ghostBtn{background:#f1f1f1}
+    .toolbar{display:flex; gap:8px; align-items:center; margin-bottom:8px; justify-content:space-between}
+    .left-tools{display:flex; gap:8px; align-items:center}
+    .right-tools{display:flex; gap:8px; align-items:center}
+    /* QR reader container */
+    #reader { width:320px; margin-top:8px; display:none; }
+    @media (max-width:900px){
+      .col.half{width:100%}
+      #reader{width:100%}
     }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 6px;
-      text-align: center;
-    }
-    #tables-container {
-      display: flex;
-      gap: 20px;
-    }
-    .table-box {
-      width: 50%;
-    }
-    #status {
-      margin-top: 10px;
-      font-weight: bold;
-      color: green;
-    }
-    .btn {
-      margin: 5px;
-      padding: 6px 12px;
-      cursor: pointer;
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 999;
-      left: 0; top: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6);
-      align-items: center;
-      justify-content: center;
-    }
-    .modal-content {
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      text-align: center;
-      min-width: 300px;
-    }
-    .numpad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .numpad button {
-      padding: 15px;
-      font-size: 18px;
-      cursor: pointer;
-    }
-    video {
-      max-width: 100%;
-      border: 1px solid #ccc;
-      margin-top: 10px;
-    }
+
+    /* Modal */
+    .modal-overlay{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:999}
+    .modal{background:#fff; border-radius:10px; padding:14px; width:360px; max-width:95%; box-sizing:border-box;}
+    .modal h4{margin:0 0 8px}
+    .modal .modal-input{width:100%; padding:10px; font-size:20px; text-align:center; border-radius:8px; border:1px solid #ddd}
+    .numpad{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px}
+    .numpad button{padding:12px; font-size:18px; border-radius:8px; border:1px solid #ccc; background:#f4f4f4; cursor:pointer}
+    .modal .actions{display:flex; gap:8px; justify-content:center; margin-top:12px}
   </style>
 </head>
 <body>
+  <div id="status" class="inactive">جارٍ محاولة تحميل ملف الإكسل...</div>
 
-  <h2>بحث المنتجات</h2>
-  <input type="text" id="searchBar" placeholder="ابحث بالاسم أو الكود أو QR" style="width:300px; padding:5px;" />
-  <button class="btn" onclick="searchProducts()">بحث</button>
-  <button class="btn" onclick="toggleFilter()">فلتر كود الميزان</button>
-  <button class="btn" onclick="startCamera()">📷 الكاميرا</button>
-  <div id="status"></div>
-  <video id="preview" autoplay></video>
+  <div class="wrap">
+    <header>
+      <h1>نظام بحث واستلام المنتجات (من ملف Excel)</h1>
+      <div class="controls">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input id="searchBar" type="text" placeholder="ابحث بالاسم أو كود الميزان أو QR" aria-label="بحث">
+          <button id="searchBtn" class="btn primary">بحث</button>
+          <button id="clearBtn" class="btn ghost">حذف</button>
+        </div>
 
-  <div id="tables-container">
-    <div class="table-box">
-      <h3>المنتجات المختارة</h3>
-      <button class="btn" onclick="clearTable('selectedTable')">حذف الكل</button>
-      <button class="btn" onclick="exportExcel()">تصدير إكسل</button>
-      <table id="selectedTable">
-        <thead>
-          <tr>
-            <th>اسم</th>
-            <th>كود الميزان</th>
-            <th>QR</th>
-            <th>العدد/الوزن</th>
-            <th>حذف</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <div class="table-box">
-      <h3>نتائج البحث</h3>
-      <button class="btn" onclick="clearTable('resultsTable')">حذف الكل</button>
-      <table id="resultsTable">
-        <thead>
-          <tr>
-            <th>اسم</th>
-            <th>كود الميزان</th>
-            <th>QR</th>
-            <th>استلام</th>
-            <th>حذف</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- المودال -->
-  <div id="modal" class="modal">
-    <div class="modal-content">
-      <h3>إدخال العدد/الوزن</h3>
-      <input type="text" id="modalInput" style="width:100%; padding:8px; font-size:16px;" />
-      <div class="numpad">
-        <button onclick="numpadPress('1')">1</button>
-        <button onclick="numpadPress('2')">2</button>
-        <button onclick="numpadPress('3')">3</button>
-        <button onclick="numpadPress('4')">4</button>
-        <button onclick="numpadPress('5')">5</button>
-        <button onclick="numpadPress('6')">6</button>
-        <button onclick="numpadPress('7')">7</button>
-        <button onclick="numpadPress('8')">8</button>
-        <button onclick="numpadPress('9')">9</button>
-        <button onclick="numpadPress('.')">.</button>
-        <button onclick="numpadPress('0')">0</button>
-        <button onclick="numpadBack()">⌫</button>
+        <div style="display:flex; align-items:center; gap:8px; margin-left:8px;">
+          <button id="cameraBtn" class="btn ghost">📷 تشغيل الكاميرا</button>
+          <button id="scaleBtn" class="btn ghost">📶 فلتر كود الميزان</button>
+        </div>
       </div>
-      <button class="btn" onclick="confirmModal()">تم</button>
-      <button class="btn" onclick="closeModal()">إلغاء</button>
+    </header>
+
+    <div class="main">
+      <!-- يمين: نتائج البحث -->
+      <div class="col half" aria-label="نتائج البحث">
+        <div class="toolbar">
+          <div class="left-tools">
+            <h3>نتائج البحث</h3>
+          </div>
+          <div class="right-tools">
+            <button id="clearResultsBtn" class="small ghostBtn" style="display:none">حذف الكل</button>
+          </div>
+        </div>
+
+        <div id="reader"></div>
+
+        <table id="resultsTable" aria-live="polite">
+          <thead>
+            <tr>
+              <th>اسم المنتج</th>
+              <th>كود الميزان</th>
+              <th>العدد/الوزن</th>
+              <th>QR Code</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- شمال: المنتجات المختارة -->
+      <div class="col half" aria-label="المنتجات المختارة">
+        <div class="toolbar">
+          <div class="left-tools">
+            <h3>المنتجات المختارة</h3>
+          </div>
+          <div class="right-tools">
+            <button id="clearAllBtn" class="small ghostBtn" style="display:none">حذف الكل</button>
+            <button id="exportBtn" class="small primary">تصدير إكسل</button>
+          </div>
+        </div>
+
+        <table id="finalTable" aria-live="polite">
+          <thead>
+            <tr>
+              <th>اسم المنتج</th>
+              <th>كود الميزان</th>
+              <th>العدد/الوزن</th>
+              <th>QR Code</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="margin-top:14px; color:var(--muted); font-size:14px">
+      ملاحظة: البيانات تُستمد من ملف إكسل (محلي)؛ اسم الملف يتم البحث عنه تلقائياً. إذا كان موجودًا سيعرض المؤشر \"ملف فعال\".
     </div>
   </div>
 
-  <!-- مكتبة QR -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <script>
-    let products = [
-      {name:"منتج 1", code:"111", qr:"A1"},
-      {name:"منتج 2", code:"222", qr:"A2"},
-      {name:"منتج 3", code:"333", qr:""}
-    ];
-    let filterActive = false;
-    let modalRow = null;
-    let html5QrCode;
+  <!-- مودال الاستلام -->
+  <div class="modal-overlay" id="receiveModal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h4 id="modalTitle">استلام المنتج</h4>
+      <div id="modalName" style="text-align:center; font-weight:700; margin-bottom:8px"></div>
+      <input id="modalInput" class="modal-input" inputmode="decimal" placeholder="العدد أو الوزن (مثال: 2 أو 0.5)">
+      <div class="numpad" aria-hidden="false" style="margin-top:10px">
+        <button onclick="modalKey('7')">7</button>
+        <button onclick="modalKey('8')">8</button>
+        <button onclick="modalKey('9')">9</button>
+        <button onclick="modalKey('4')">4</button>
+        <button onclick="modalKey('5')">5</button>
+        <button onclick="modalKey('6')">6</button>
+        <button onclick="modalKey('1')">1</button>
+        <button onclick="modalKey('2')">2</button>
+        <button onclick="modalKey('3')">3</button>
+        <button onclick="modalBack()">⌫</button>
+        <button onclick="modalKey('0')">0</button>
+        <button onclick="modalKey('.')">.</button>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" onclick="closeModal()">إلغاء</button>
+        <button class="btn primary" onclick="confirmModal()">تم</button>
+      </div>
+    </div>
+  </div>
 
-    function searchProducts() {
-      let q = document.getElementById("searchBar").value.trim();
-      let resultsBody = document.querySelector("#resultsTable tbody");
-      resultsBody.innerHTML = "";
-      let shown = {};
-      products.forEach(p=>{
-        if(filterActive && !p.code) return;
-        if(p.name.includes(q) || p.code.includes(q) || p.qr.includes(q)){
-          let uid = p.qr || p.code;
-          if(shown[uid]) {
-            alert("تنبيه: المنتج مكرر في المصدر");
-            return;
-          }
-          shown[uid]=true;
-          let tr=document.createElement("tr");
-          tr.innerHTML = `
-            <td>${p.name}</td>
-            <td>${p.code}</td>
-            <td>${p.qr}</td>
-            <td><button onclick="openModal(this)">استلام</button></td>
-            <td><button onclick="tr.remove()">🗑</button></td>`;
-          resultsBody.appendChild(tr);
+  <script>
+    /**************************************************************************
+     * متغيرات وحالة
+     **************************************************************************/
+    let rawExcel = [];            // بيانات الإكسل كما أتت (array of arrays)
+    let uniqueExcel = [];         // صفوف فريدة للعرض (بعد إزالة التكرار)
+    let duplicatesInExcel = false;
+    let displayedDuplicateAlert = false;
+
+    const statusEl = document.getElementById('status');
+    const searchBar = document.getElementById('searchBar');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const cameraBtn = document.getElementById('cameraBtn');
+    const scaleBtn = document.getElementById('scaleBtn');
+    const resultsTbody = document.querySelector('#resultsTable tbody');
+    const finalTbody = document.querySelector('#finalTable tbody');
+    const clearResultsBtn = document.getElementById('clearResultsBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const exportBtn = document.getElementById('exportBtn');
+
+    const receiveModal = document.getElementById('receiveModal');
+    const modalInput = document.getElementById('modalInput');
+    const modalName = document.getElementById('modalName');
+
+    // Map لحفظ المنتجات المضافة في الجدول الشمال: uid -> {rowEl, qty, rowData}
+    const finalMap = new Map();
+
+    // QR scanner
+    let html5QrCode = null;
+    let scannerRunning = false;
+    let lastScan = { text: null, time: 0 };
+
+    // اسماء ممكنة لملف الاكسل (بما فيها الاسم اللي قلت عليه)
+    const excelCandidates = [
+      "عندك.xlsx",
+      "عندك.xls",
+      "product.template(176).xlsx",
+      "products.xlsx",
+      "product.xlsx",
+      "data.xlsx",
+      "products_template.xlsx"
+    ];
+
+    /**************************************************************************
+     * مساعدة: الحصول على معرف فريد من صف (QR أولًا، ثم كود الميزان، ثم الاسم)
+     **************************************************************************/
+    function getUidFromRow(row){
+      const qr = (row[3] || "").toString().trim();
+      const code = (row[2] || "").toString().trim();
+      const name = (row[0] || "").toString().trim();
+      if(qr) return "QR::" + qr;
+      if(code) return "CODE::" + code;
+      return "NAME::" + name;
+    }
+
+    /**************************************************************************
+     * محاولة تحميل ملف الاكسل من قائمة الأسماء
+     **************************************************************************/
+    function tryLoadExcel(list){
+      let idx = 0;
+      function attempt(){
+        if(idx >= list.length){
+          statusEl.textContent = "لا يوجد ملف فعال";
+          statusEl.className = "inactive";
+          rawExcel = [];
+          uniqueExcel = [];
+          return;
         }
+        const name = list[idx++];
+        fetch(name).then(res=>{
+          if(!res.ok) throw new Error("not found");
+          return res.arrayBuffer();
+        }).then(buff=>{
+          try{
+            const wb = XLSX.read(new Uint8Array(buff), {type:'array'});
+            const sheet = wb.SheetNames[0];
+            rawExcel = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1 }); // array of rows
+            statusEl.textContent = "ملف فعال: " + name;
+            statusEl.className = "active";
+            processExcelData();
+          }catch(e){
+            console.error("خطأ قراءة:", e);
+            attempt();
+          }
+        }).catch(err=>{
+          // حاول الاسم التالي
+          attempt();
+        });
+      }
+      attempt();
+    }
+
+    /**************************************************************************
+     * معالجة بيانات الإكسل: إزالة التكرارات للعرض وإظهار تنبيه لمرة واحدة
+     **************************************************************************/
+    function processExcelData(){
+      uniqueExcel = [];
+      const seen = new Set();
+      duplicatesInExcel = false;
+      // نفترض الصف الأول header لذا نبدأ من index 1 إذا كانت موجودة
+      const start = 1; // دائمًا نفترض هناك header لأن ملفات المنتج غالبًا تحتويه
+      for(let i = start; i < rawExcel.length; i++){
+        const row = rawExcel[i] || [];
+        if(row.length === 0) continue;
+        const uid = getUidFromRow(row);
+        if(seen.has(uid)){
+          duplicatesInExcel = true;
+          continue;
+        }
+        seen.add(uid);
+        uniqueExcel.push(row);
+      }
+      if(duplicatesInExcel && !displayedDuplicateAlert){
+        displayedDuplicateAlert = true;
+        alert("تنبيه: يوجد سجلات مكررة في ملف الإكسل. سيتم عرض نسخة واحدة فقط من كل منتج في نتائج البحث.");
+      }
+    }
+
+    /**************************************************************************
+     * البحث (شريط البحث مسؤول عن البحث في الاسم و الكود و QR)
+     **************************************************************************/
+    function search(fromScanner=false, value=""){
+      const q = fromScanner ? (value+"").trim().toLowerCase() : (searchBar.value||"").trim().toLowerCase();
+      resultsTbody.innerHTML = "";
+      if(!uniqueExcel || uniqueExcel.length === 0) return;
+      const shown = new Set();
+      uniqueExcel.forEach(row=>{
+        const name = (row[0] || "").toString().toLowerCase();
+        const code = (row[2] || "").toString().toLowerCase();
+        const qr = (row[3] || "").toString().toLowerCase();
+        const uid = getUidFromRow(row);
+        if(shown.has(uid)) return;
+        if(name.includes(q) || code.includes(q) || qr.includes(q)){
+          shown.add(uid);
+          const tr = document.createElement('tr');
+
+          const tdName = document.createElement('td'); tdName.textContent = row[0] || ""; tr.appendChild(tdName);
+          const tdCode = document.createElement('td'); tdCode.textContent = row[2] || ""; tr.appendChild(tdCode);
+          const tdQty = document.createElement('td'); tdQty.textContent = ""; tr.appendChild(tdQty);
+          const tdQr = document.createElement('td'); tdQr.textContent = row[3] || ""; tr.appendChild(tdQr);
+
+          const tdAction = document.createElement('td');
+          const receiveBtn = document.createElement('button');
+          receiveBtn.className = 'small addBtn';
+          receiveBtn.textContent = 'استلام';
+          receiveBtn.addEventListener('click', ()=> openReceiveModal(row));
+          tdAction.appendChild(receiveBtn);
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'small delBtn';
+          delBtn.textContent = 'حذف';
+          delBtn.addEventListener('click', ()=> { tr.remove(); checkClearResultsVisibility(); });
+          tdAction.appendChild(delBtn);
+
+          tr.appendChild(tdAction);
+
+          // attach rowData for reference (not visible)
+          tr.dataset.uid = uid;
+
+          resultsTbody.appendChild(tr);
+        }
+      });
+
+      applyScaleFilterTo(resultsTbody);
+      checkClearResultsVisibility();
+    }
+
+    function clearSearch(){
+      searchBar.value = "";
+      resultsTbody.innerHTML = "";
+      checkClearResultsVisibility();
+    }
+
+    /**************************************************************************
+     * فلتر كود الميزان
+     **************************************************************************/
+    let scaleFilterActive = false;
+    function toggleScaleFilter(){
+      scaleFilterActive = !scaleFilterActive;
+      scaleBtn.classList.toggle('active', scaleFilterActive);
+      applyScaleFilterTo(resultsTbody);
+      applyScaleFilterTo(finalTbody);
+    }
+    function applyScaleFilterTo(tbody){
+      if(!tbody) return;
+      Array.from(tbody.rows).forEach(row=>{
+        const codeCell = row.cells[1]; // index 1 => كود الميزان
+        const val = codeCell ? (codeCell.textContent||"").trim() : "";
+        row.style.display = (scaleFilterActive && val === "") ? 'none' : '';
       });
     }
 
-    function toggleFilter(){
-      filterActive=!filterActive;
-      searchProducts();
-    }
+    /**************************************************************************
+     * مودال الاستلام: فتح/إغلاق/مفتاح/تأكيد
+     **************************************************************************/
+    let modalCurrentRowData = null; // array rowData
 
-    function clearTable(id){
-      document.querySelector("#"+id+" tbody").innerHTML="";
-    }
-
-    function openModal(btn){
-      modalRow = btn.closest("tr");
-      let uid = modalRow.children[2].textContent || modalRow.children[1].textContent;
-      let existingRow = [...document.querySelectorAll("#selectedTable tbody tr")]
-        .find(r => (r.children[2].textContent||r.children[1].textContent)===uid);
-      document.getElementById("modalInput").value = existingRow ? existingRow.children[3].textContent : "";
-      document.getElementById("modal").style.display="flex";
+    function openReceiveModal(rowData){
+      modalCurrentRowData = rowData;
+      const uid = getUidFromRow(rowData);
+      modalName.textContent = rowData[0] || '';
+      // إذا موجود في finalMap نملأ القيمة الحالية
+      if(finalMap.has(uid)){
+        modalInput.value = finalMap.get(uid).qty || "";
+      } else {
+        modalInput.value = "";
+      }
+      receiveModal.style.display = 'flex';
+      setTimeout(()=> modalInput.focus(), 120);
     }
 
     function closeModal(){
-      document.getElementById("modal").style.display="none";
+      receiveModal.style.display = 'none';
+      modalCurrentRowData = null;
+      modalInput.value = "";
     }
 
-    function numpadPress(v){
-      let inp=document.getElementById("modalInput");
-      inp.value += v;
+    function modalKey(ch){
+      // منع نقطتين
+      if(ch === '.' && (modalInput.value||'').includes('.')) return;
+      modalInput.value = (modalInput.value || '') + ch;
+      modalInput.focus();
     }
-    function numpadBack(){
-      let inp=document.getElementById("modalInput");
-      inp.value=inp.value.slice(0,-1);
+
+    function modalBack(){
+      modalInput.value = (modalInput.value || '').slice(0,-1);
+      modalInput.focus();
     }
 
     function confirmModal(){
-      let val=document.getElementById("modalInput").value.trim();
-      if(!val){alert("أدخل قيمة صحيحة");return;}
-      let name=modalRow.children[0].textContent;
-      let code=modalRow.children[1].textContent;
-      let qr=modalRow.children[2].textContent;
-      let uid=qr||code;
-      let tbody=document.querySelector("#selectedTable tbody");
-      let row=[...tbody.querySelectorAll("tr")].find(r=>(r.children[2].textContent||r.children[1].textContent)===uid);
-      if(row){
-        row.children[3].textContent=val;
-      } else {
-        let tr=document.createElement("tr");
-        tr.innerHTML=`<td>${name}</td><td>${code}</td><td>${qr}</td><td>${val}</td><td><button onclick="tr.remove()">🗑</button></td>`;
-        tbody.appendChild(tr);
+      const v = (modalInput.value || '').trim();
+      if(v === ''){
+        alert('لا يمكن ترك الحقل فارغاً');
+        modalInput.focus();
+        return;
       }
+      // السماح بالعشرات: تحقق رقمي
+      const num = Number(v);
+      if(!isFinite(num)){
+        alert('الرجاء إدخال رقم صالح للعدد/الوزن');
+        modalInput.focus();
+        return;
+      }
+      // إضافة أو تحديث في الجدول الشمال (نسخة فقط)
+      addOrUpdateFinal(modalCurrentRowData, v);
       closeModal();
     }
 
-    function exportExcel(){
-      let rows=[["اسم","كود الميزان","QR","العدد/الوزن"]];
-      document.querySelectorAll("#selectedTable tbody tr").forEach(r=>{
-        rows.push([r.children[0].textContent, r.children[1].textContent, r.children[2].textContent, r.children[3].textContent]);
-      });
-      let csv=rows.map(r=>r.join(",")).join("\n");
-      let blob=new Blob([csv],{type:"text/csv"});
-      let a=document.createElement("a");
-      a.href=URL.createObjectURL(blob);
-      a.download="selected.csv";
-      a.click();
-    }
-
-    function startCamera(){
-      if(html5QrCode){
-        html5QrCode.stop().then(()=>{html5QrCode=null;});
+    /**************************************************************************
+     * إدارة جدول final (المنتجات المختارة)
+     **************************************************************************/
+    function addOrUpdateFinal(rowData, qty){
+      const uid = getUidFromRow(rowData);
+      // لو موجود -> استبدال القيمة فقط
+      if(finalMap.has(uid)){
+        const entry = finalMap.get(uid);
+        entry.qty = qty;
+        if(entry.rowEl){
+          entry.rowEl.cells[2].textContent = qty; // العدد/الوزن هو الخلية index 2
+        }
         return;
       }
-      html5QrCode = new Html5Qrcode("preview");
-      Html5Qrcode.getCameras().then(devices=>{
-        if(devices && devices.length){
-          html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: 250 },
-            qrCodeMessage => {
-              document.getElementById("searchBar").value = qrCodeMessage;
-            },
-            errorMessage => {}
-          );
-        }
-      }).catch(err=>alert("خطأ في الكاميرا: "+err));
+      // إنشاء صف جديد
+      const tr = document.createElement('tr');
+      const tdName = document.createElement('td'); tdName.textContent = rowData[0] || ""; tr.appendChild(tdName);
+      const tdCode = document.createElement('td'); tdCode.textContent = rowData[2] || ""; tr.appendChild(tdCode);
+      const tdQty = document.createElement('td'); tdQty.textContent = qty; tr.appendChild(tdQty);
+      const tdQr = document.createElement('td'); tdQr.textContent = rowData[3] || ""; tr.appendChild(tdQr);
+
+      const tdAction = document.createElement('td');
+      const delBtn = document.createElement('button');
+      delBtn.className = 'small delBtn';
+      delBtn.textContent = 'حذف';
+      delBtn.addEventListener('click', ()=>{
+        tr.remove();
+        finalMap.delete(uid);
+        checkClearAllVisibility();
+      });
+      tdAction.appendChild(delBtn);
+      tr.appendChild(tdAction);
+
+      finalTbody.appendChild(tr);
+      finalMap.set(uid, { rowEl: tr, qty: qty, rowData: rowData });
+      applyScaleFilterTo(finalTbody);
+      checkClearAllVisibility();
     }
+
+    function clearAllSelected(){
+      finalTbody.innerHTML = "";
+      finalMap.clear();
+      checkClearAllVisibility();
+    }
+
+    function checkClearAllVisibility(){
+      clearAllBtn.style.display = (finalTbody.rows.length === 0) ? 'none' : 'inline-block';
+    }
+
+    function checkClearResultsVisibility(){
+      clearResultsBtn.style.display = (resultsTbody.rows.length === 0) ? 'none' : 'inline-block';
+    }
+
+    /**************************************************************************
+     * منع التكرار عند العرض - تم معالجته في uniqueExcel
+     * لكن أيضاً نتأكد عند الإضافة أن finalMap لا تسمح بتكرار
+     **************************************************************************/
+
+    /**************************************************************************
+     * تصدير الجدول الشمال إلى إكسل
+     **************************************************************************/
+    function exportFinalToExcel(){
+      // نجهز مصفوفة AOA: header + rows
+      const aoa = [["اسم المنتج", "كود الميزان", "العدد/الوزن", "QR Code"]];
+      Array.from(finalTbody.rows).forEach(r=>{
+        const name = (r.cells[0] && r.cells[0].textContent) || "";
+        const code = (r.cells[1] && r.cells[1].textContent) || "";
+        const qty = (r.cells[2] && r.cells[2].textContent) || "";
+        const qr = (r.cells[3] && r.cells[3].textContent) || "";
+        aoa.push([name, code, qty, qr]);
+      });
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, "المنتجات");
+      XLSX.writeFile(wb, "exported_products.xlsx");
+    }
+
+    /**************************************************************************
+     * قارئ QR: يضع القيمة في searchBar فقط (لا يضيف ولا يبحث تلقائياً)
+     **************************************************************************/
+    function toggleScanner(){
+      if(scannerRunning){
+        stopScanner();
+      } else {
+        startScanner();
+      }
+    }
+
+    async function startScanner(){
+      const readerEl = document.getElementById('reader');
+      readerEl.style.display = 'block';
+      cameraBtn.textContent = '⏹ إيقاف الكاميرا';
+      try{
+        html5QrCode = new Html5Qrcode("reader");
+        const devices = await Html5Qrcode.getCameras();
+        const cameraId = (devices && devices.length) ? devices[0].id : null;
+        await html5QrCode.start(
+          cameraId ? cameraId : { facingMode: "environment" },
+          { fps: 10, qrbox: 250 },
+          (decodedText, decodedResult) => {
+            const now = Date.now();
+            if(decodedText === lastScan.text && (now - lastScan.time) < 600) {
+              lastScan.time = now;
+              return;
+            }
+            lastScan.text = decodedText;
+            lastScan.time = now;
+            // فقط ننسخ النص لحقل البحث ولا نبحث أو نضيف
+            searchBar.value = decodedText;
+            searchBar.focus();
+            // بعد وضع القيمة نوقف الماسح تلقائياً ليقرر المستخدم متى يشغله مرة أخرى
+            stopScanner();
+          },
+          (errorMessage) => {
+            // تجاهل أخطاء الفريمات الصغيرة
+          }
+        );
+        scannerRunning = true;
+      }catch(err){
+        alert('فشل تشغيل الكاميرا: ' + err);
+        readerEl.style.display = 'none';
+        cameraBtn.textContent = '📷 تشغيل الكاميرا';
+        scannerRunning = false;
+      }
+    }
+
+    function stopScanner(){
+      const readerEl = document.getElementById('reader');
+      if(html5QrCode){
+        html5QrCode.stop().then(()=> {
+          try{ html5QrCode.clear(); }catch(e){}
+          html5QrCode = null;
+        }).catch(()=>{ html5QrCode = null; });
+      }
+      readerEl.style.display = 'none';
+      cameraBtn.textContent = '📷 تشغيل الكاميرا';
+      scannerRunning = false;
+    }
+
+    /**************************************************************************
+     * تهيئة الأحداث
+     **************************************************************************/
+    // أزرار التحكم
+    searchBtn.addEventListener('click', ()=> search(false));
+    clearBtn.addEventListener('click', clearSearch);
+    cameraBtn.addEventListener('click', toggleScanner);
+    scaleBtn.addEventListener('click', toggleScaleFilter);
+    clearResultsBtn.addEventListener('click', ()=> { resultsTbody.innerHTML = ""; checkClearResultsVisibility(); });
+    clearAllBtn.addEventListener('click', clearAllSelected);
+    exportBtn.addEventListener('click', exportFinalToExcel);
+
+    // فتح المودال عند الضغط Enter على الصف المحدد من نتائج البحث (دعم لوحة مفاتيح)
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' && document.activeElement !== modalInput) {
+        // إذا كان في نتيجة مع التركيز، نقوم بالبحث
+        if(document.activeElement === searchBar) {
+          e.preventDefault();
+          search(false);
+        }
+      }
+      if(e.key === 'Delete') {
+        // حذف آخر صف في final
+        if(finalTbody.rows.length > 0){
+          finalTbody.deleteRow(finalTbody.rows.length - 1);
+          // إعادة بناء الخريطة
+          rebuildFinalMapFromDom();
+          checkClearAllVisibility();
+        }
+      }
+    });
+
+    // استخدام التفويض لالتقاط زر الاستلام في نتائج البحث (بما أن الصفوف تُنشأ ديناميكياً)
+    resultsTbody.addEventListener('click', function(e){
+      const btn = e.target.closest('button');
+      if(!btn) return;
+      if(btn.textContent && btn.textContent.indexOf('استلام') !== -1){
+        // إيجاد صف أب
+        const tr = btn.closest('tr');
+        // نحتاج لإيجاد rowData في uniqueExcel باستخدام uid
+        // uid موجود في tr.dataset.uid? (لم نضعها مباشرة). فلنحسب uid من الخلايا
+        const name = (tr.cells[0] && tr.cells[0].textContent) || "";
+        const code = (tr.cells[1] && tr.cells[1].textContent) || "";
+        const qr = (tr.cells[3] && tr.cells[3].textContent) || "";
+        // البحث في uniqueExcel عن صف يطابق هذه البيانات
+        const rowData = uniqueExcel.find(r => {
+          const rn = (r[0]||"").toString(), rc = (r[2]||"").toString(), rq = (r[3]||"").toString();
+          return rn === name && rc === code && rq === qr;
+        });
+        if(rowData){
+          openReceiveModal(rowData);
+        } else {
+          // كاحتياط، نبني صف مؤقت من الخلايا
+          openReceiveModal([name, '', code, qr]);
+        }
+      }
+    });
+
+    // إعادة بناء finalMap إذا تم التعديل يدوياً في DOM
+    function rebuildFinalMapFromDom(){
+      finalMap.clear();
+      Array.from(finalTbody.rows).forEach(r=>{
+        const name = (r.cells[0] && r.cells[0].textContent) || "";
+        const code = (r.cells[1] && r.cells[1].textContent) || "";
+        const qty = (r.cells[2] && r.cells[2].textContent) || "";
+        const qr = (r.cells[3] && r.cells[3].textContent) || "";
+        const rowData = [name, '', code, qr];
+        const uid = getUidFromRow(rowData);
+        finalMap.set(uid, { rowEl: r, qty: qty, rowData: rowData });
+      });
+    }
+
+    /**************************************************************************
+     * تحميل الملف عند بداية الصفحة وتجهيز الواجهة
+     **************************************************************************/
+    window.addEventListener('load', function(){
+      tryLoadExcel(excelCandidates);
+      // وضع التركيز على شريط البحث
+      setTimeout(()=>{ try{ searchBar.focus(); }catch(e){} }, 200);
+      checkClearAllVisibility();
+      checkClearResultsVisibility();
+    });
+
+    /**************************************************************************
+     * أزرار المودال: إغلاق عند الضغط خارج المحتوى
+     **************************************************************************/
+    receiveModal.addEventListener('click', function(e){
+      if(e.target === receiveModal) closeModal();
+    });
+
+    /**************************************************************************
+     * مساعدة: إعادة تطبيق فلتر بعد أي تغيير DOM
+     **************************************************************************/
+    const observerFinal = new MutationObserver(()=> applyScaleFilterTo(finalTbody));
+    observerFinal.observe(finalTbody, { childList:true, subtree:true });
+
   </script>
 </body>
 </html>
