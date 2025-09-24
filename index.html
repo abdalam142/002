@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=1024" />
-  <title>بحث واستلام منتجات (من ملف Excel)</title>
+  <title>نظام بحث واستلام المنتجات (من ملف Excel)</title>
 
   <!-- مكتبات -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -140,7 +140,7 @@
     </div>
 
     <div style="margin-top:14px; color:var(--muted); font-size:14px">
-      ملاحظة: البيانات تُستمد من ملف إكسل (محلي)؛ اسم الملف يتم البحث عنه تلقائياً. إذا كان موجودًا سيعرض المؤشر \"ملف فعال\". (الملف الأصلي لن يتم التعديل عليه).
+      ملاحظة: البيانات تُستمد من ملف إكسل (محلي)؛ اسم الملف يتم البحث عنه تلقائياً. إذا كان موجودًا سيعرض المؤشر "ملف فعال". (الملف الأصلي لن يتم التعديل عليه).
     </div>
   </div>
 
@@ -176,8 +176,7 @@
      * الحالة والمتغيرات
      **************************************************************************/
     let rawExcel = [];            // نحتفظ بنسخة كما هي من ملف الإكسل (لا نغيّره)
-    let displayedRowsCount = 0;
-    let duplicatesInSource = false; // نحتفظ بالمعلومة لكن لا نغيّر الملف
+    let duplicatesInSource = false;
     const excelCandidates = [
       "عندك.xlsx",
       "عندك.xls",
@@ -251,7 +250,7 @@
             rawExcel = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1 }); // احتفظ بالصفوف كما هي
             statusEl.textContent = "ملف فعال: " + name;
             statusEl.className = "active";
-            // نفحص إذا كانت هناك سجلات مكررة في المصدر فقط كتنبيه داخلي (لكن لن نغير الملف)
+            // نفحص وجود تكرارات في المصدر فقط (تنبيه داخلي) لكن لا نغيّر الملف
             detectDuplicatesInSource();
           } catch(e){
             attempt();
@@ -266,7 +265,7 @@
     function detectDuplicatesInSource(){
       duplicatesInSource = false;
       const seen = new Set();
-      // نبدأ غالبًا من index 1 لأن الصف 0 header في ملفات المنتج الشائعة، لكن لو الملف بدون header لا مشكلة
+      // عادة يكون الصف 0 header؛ نبدأ من 1. لو الملف بدون header سيعرض نتائج من 1..n حيث سيتجاهل الصف 0 كـ header.
       for(let i = 1; i < rawExcel.length; i++){
         const row = rawExcel[i] || [];
         if(row.length === 0) continue;
@@ -277,7 +276,6 @@
         }
         seen.add(uid);
       }
-      // نعرض حالة بسيطة في الـ status لكن لا نغيّر الملف ولا نمنع أي شيء
       if(duplicatesInSource){
         statusEl.textContent += " (يوجد سجلات مكررة في المصدر)";
       }
@@ -290,13 +288,11 @@
     function search(fromScanner=false, value=""){
       const q = fromScanner ? (value+"").trim().toLowerCase() : (searchBar.value||"").trim().toLowerCase();
       resultsTbody.innerHTML = "";
-      displayedRowsCount = 0;
-      if(!Array.isArray(rawExcel) || rawExcel.length <= 1) { // لا بيانات أو فقط header
+      if(!Array.isArray(rawExcel) || rawExcel.length <= 1){
         checkClearResultsVisibility();
         return;
       }
-      // ابدأ من index 1 افتراضياً (header موجود). إذا لم يكن هناك header، يمكن تعديل index إلى 0.
-      const startIndex = 1;
+      const startIndex = 1; // نفترض header في index 0
       for(let i = startIndex; i < rawExcel.length; i++){
         const row = rawExcel[i] || [];
         if(row.length === 0) continue;
@@ -304,7 +300,6 @@
         const code = (row[2] || "").toString().toLowerCase();
         const qr = (row[3] || "").toString().toLowerCase();
         if(name.includes(q) || code.includes(q) || qr.includes(q)){
-          // نعرض كل تكرار كما هو موجود في المصدر
           const tr = document.createElement('tr');
           const tdName = document.createElement('td'); tdName.textContent = row[0] || ""; tr.appendChild(tdName);
           const tdCode = document.createElement('td'); tdCode.textContent = row[2] || ""; tr.appendChild(tdCode);
@@ -330,7 +325,6 @@
 
           tr.appendChild(tdAction);
           resultsTbody.appendChild(tr);
-          displayedRowsCount++;
         }
       }
 
@@ -366,7 +360,7 @@
     function openReceiveModalFromResults(sourceIndex){
       const rowData = rawExcel[sourceIndex] || [];
       modalCurrentRowData = rowData;
-      modalEditingFinalUid = null; // لا تعديل لصف موجود — فتح من نتائج البحث لإضافة/تحديث
+      modalEditingFinalUid = null; // فتح من نتائج البحث => إضافة أو تحديث final حسب UID
       modalName.textContent = rowData[0] || '';
       const uid = getUidFromRow(rowData);
       if(finalMap.has(uid)){
@@ -425,7 +419,6 @@
       }
 
       if(modalEditingFinalUid){
-        // تعديل قيمة موجودة في final
         const entry = finalMap.get(modalEditingFinalUid);
         if(entry && entry.rowEl){
           entry.qty = v;
@@ -435,7 +428,6 @@
         return;
       }
 
-      // إضافة أو تحديث من نتائج البحث
       if(!modalCurrentRowData){
         alert('خطأ: لا توجد بيانات للصف الحالي');
         closeModal();
@@ -450,7 +442,6 @@
      **************************************************************************/
     function addOrUpdateFinal(rowData, qty){
       const uid = getUidFromRow(rowData);
-      // إذا موجود: استبدال القيمة
       if(finalMap.has(uid)){
         const existing = finalMap.get(uid);
         existing.qty = qty;
@@ -459,7 +450,6 @@
         }
         return 'updated';
       }
-      // إنشاء صف جديد
       const tr = document.createElement('tr');
       const tdName = document.createElement('td'); tdName.textContent = rowData[0] || ""; tr.appendChild(tdName);
       const tdCode = document.createElement('td'); tdCode.textContent = rowData[2] || ""; tr.appendChild(tdCode);
@@ -528,8 +518,28 @@
     }
 
     /**************************************************************************
-     * قارئ QR: فقط ينسخ القيمة لحقل البحث (لا يضيف/لا يبحث تلقائيًا)
+     * قارئ QR: اختر الكاميرا الخلفية إن وُجدت، ونسخ القيمة لحقل البحث فقط
      **************************************************************************/
+    function chooseBackCamera(devices){
+      if(!devices || devices.length === 0) return null;
+      // حاول إيجاد كاميرا ذات تسميات تشير للخلفية
+      const keywords = ["back","rear","env","environment","back camera","kamera belakang","الكاميرا الخلفية","خلفي","rear camera"];
+      for(const d of devices){
+        const label = (d.label || "").toLowerCase();
+        for(const k of keywords){
+          if(label.includes(k)) return d.id || d.deviceId || (d.id??d.deviceId);
+        }
+      }
+      // إذا لم نجد، ختار آخر جهاز غالباً هو الخلفية
+      if(devices.length > 1){
+        const last = devices[devices.length - 1];
+        return last.id || last.deviceId || (last.id??last.deviceId);
+      }
+      // fallback: أول جهاز
+      const first = devices[0];
+      return first.id || first.deviceId || (first.id??first.deviceId);
+    }
+
     async function startScanner(){
       const readerEl = document.getElementById('reader');
       if(scannerRunning){
@@ -550,9 +560,11 @@
       try{
         html5QrCode = new Html5Qrcode("reader");
         const devices = await Html5Qrcode.getCameras();
-        const cameraId = (devices && devices.length) ? devices[0].id : null;
+        const chosenId = chooseBackCamera(devices);
+        const cameraConfig = chosenId ? { deviceId: { exact: chosenId } } : { facingMode: "environment" };
+
         await html5QrCode.start(
-          cameraId ? cameraId : { facingMode: "environment" },
+          cameraConfig,
           { fps: 10, qrbox: 250 },
           (decodedText, decodedResult) => {
             const now = Date.now();
@@ -562,12 +574,13 @@
             }
             lastScan.text = decodedText;
             lastScan.time = now;
+            // فقط ننسخ النص لحقل البحث ولا نبحث أو نضيف
             searchBar.value = decodedText;
             searchBar.focus();
-            // لا نقوم ببحث تلقائي أو إضافة؛ نوقف الماسح ليرجع القرار للمستخدم
+            // نوقف الماسح ليرجع القرار للمستخدم
             if(html5QrCode){
-              html5QrCode.stop().then(()=> {
-                try{ html5QrCode.clear(); }catch(e){}
+              html5QrCode.stop().then(()=>{
+                try{ html5QrCode.clear(); } catch(e){}
                 html5QrCode = null;
                 readerEl.style.display = 'none';
                 cameraBtn.textContent = '📷 تشغيل الكاميرا';
@@ -576,7 +589,7 @@
             }
           },
           (errorMessage) => {
-            // ignore per-frame errors
+            // ignore frame errors
           }
         );
         scannerRunning = true;
@@ -599,7 +612,6 @@
     clearAllBtn.addEventListener('click', clearAllSelected);
     exportBtn.addEventListener('click', exportFinalToExcel);
 
-    // مفتاح Enter للبحث
     document.addEventListener('keydown', function(e){
       if(e.key === 'Enter' && document.activeElement === searchBar){
         e.preventDefault();
@@ -614,20 +626,40 @@
       }
     });
 
-    // عند تحميل الصفحة: محاولة العثور على ملف الإكسل
-    window.addEventListener('load', function(){
-      tryLoadExcel(excelCandidates);
-      setTimeout(()=>{ try{ searchBar.focus(); }catch(e){} }, 200);
-      checkClearAllVisibility();
-      checkClearResultsVisibility();
+    // التفويض لزر استلام في نتائج البحث (تضمن أن الصفوف الديناميكية تعمل)
+    resultsTbody.addEventListener('click', function(e){
+      const btn = e.target.closest('button');
+      if(!btn) return;
+      const tr = btn.closest('tr');
+      if(!tr) return;
+      if(btn.classList.contains('addBtn') || btn.textContent.indexOf('استلام') !== -1){
+        const idx = tr.dataset.sourceIndex ? Number(tr.dataset.sourceIndex) : null;
+        if(idx !== null){
+          openReceiveModalFromResults(idx);
+        } else {
+          // fallback: build row from cells
+          const name = (tr.cells[0] && tr.cells[0].textContent) || "";
+          const code = (tr.cells[1] && tr.cells[1].textContent) || "";
+          const qr = (tr.cells[3] && tr.cells[3].textContent) || "";
+          openReceiveModalFromResultsFallback([name, '', code, qr]);
+        }
+      }
     });
 
-    // إغلاق المودال عند النقر خارج المحتوى
-    receiveModal.addEventListener('click', function(e){
-      if(e.target === receiveModal) closeModal();
-    });
+    function openReceiveModalFromResultsFallback(rowData){
+      modalCurrentRowData = rowData;
+      modalEditingFinalUid = null;
+      modalName.textContent = rowData[0] || '';
+      const uid = getUidFromRow(rowData);
+      if(finalMap.has(uid)){
+        modalInput.value = finalMap.get(uid).qty || "";
+      } else {
+        modalInput.value = "";
+      }
+      receiveModal.style.display = 'flex';
+      setTimeout(()=> modalInput.focus(), 100);
+    }
 
-    // إعادة بناء finalMap من DOM إذا لزم الأمر
     function rebuildFinalMapFromDom(){
       finalMap.clear();
       Array.from(finalTbody.rows).forEach(r=>{
@@ -641,9 +673,57 @@
       });
     }
 
+    // إغلاق المودال عند النقر خارج المحتوى
+    receiveModal.addEventListener('click', function(e){
+      if(e.target === receiveModal) closeModal();
+    });
+
     // راقب finalTbody لإعادة تطبيق الفلتر تلقائياً
     const observerFinal = new MutationObserver(()=> applyScaleFilterTo(finalTbody));
     observerFinal.observe(finalTbody, { childList:true, subtree:true });
+
+    // تحميل الملف عند بداية الصفحة
+    window.addEventListener('load', function(){
+      tryLoadExcel(excelCandidates);
+      setTimeout(()=>{ try{ searchBar.focus(); }catch(e){} }, 200);
+      checkClearAllVisibility();
+      checkClearResultsVisibility();
+    });
+
+    /**************************************************************************
+     * وظائف مساعدة أخيرة
+     **************************************************************************/
+    function tryLoadExcel(list){
+      // wrapper فوق الدالة المعرفة سابقًا لتجنب الاعتراضات
+      let idx = 0;
+      function attempt(){
+        if(idx >= list.length){
+          statusEl.textContent = "لا يوجد ملف فعال";
+          statusEl.className = "inactive";
+          rawExcel = [];
+          return;
+        }
+        const name = list[idx++];
+        fetch(name).then(res => {
+          if(!res.ok) throw new Error('not found');
+          return res.arrayBuffer();
+        }).then(buff => {
+          try {
+            const wb = XLSX.read(new Uint8Array(buff), { type:'array' });
+            const sheet = wb.SheetNames[0];
+            rawExcel = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1 });
+            statusEl.textContent = "ملف فعال: " + name;
+            statusEl.className = "active";
+            detectDuplicatesInSource();
+          } catch(e){
+            attempt();
+          }
+        }).catch(err => {
+          attempt();
+        });
+      }
+      attempt();
+    }
 
   </script>
 </body>
