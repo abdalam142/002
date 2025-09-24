@@ -1,12 +1,10 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>بحث في المنتجات</title>
+  <meta name="viewport" content="width=1024" />
+  <title>استلام المنتجات</title>
 
-  <!-- مكتبات -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>
 
@@ -43,11 +41,57 @@
     #status.active { background: var(--success); }
     #status.inactive { background: var(--danger); }
 
-    #app {
-      display: block;
-      margin-top: 14px;
+    #loginBox {
+      background: var(--card-bg);
+      padding: 14px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      max-width: 420px;
+      margin: 10px auto;
+      text-align: center;
+    }
+    #passwordInput {
+      width: 100%;
+      max-width: 260px;
+      padding: 10px;
+      font-size: 20px;
+      text-align: center;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .numpad {
+      width: 260px;
+      margin: 12px auto 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .numpad button {
+      padding: 12px;
+      font-size: 18px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #f3f3f3;
+      cursor: pointer;
+    }
+    #passError {
+      display: none;
+      margin-top: 10px;
+      color: #842029;
+      background: #f8d7da;
+      border: 1px solid #f5c2c7;
+      padding: 8px 10px;
+      border-radius: 6px;
+      width: 90%;
+      max-width: 320px;
+      margin-inline: auto;
+      box-sizing: border-box;
     }
 
+    #app {
+      display: none;
+      margin-top: 14px;
+    }
     .searchRow {
       text-align: center;
       margin-bottom: 12px;
@@ -73,38 +117,12 @@
     .btn.primary { background: var(--primary); color: #fff; }
     .btn.ghost { background: #e9ecef; }
     .btn.camera { background: var(--accent); color: #fff; }
-
-    #cameraBtn {
-      width: 44px;
-      height: 44px;
-      padding: 0;
-      border-radius: 8px;
-      font-size: 18px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
     .btn.scale-active { background: #ffc107; color: #111; }
 
     #reader {
-      width: 88px;
-      height: 88px;
-      margin: 10px;
+      width: 320px;
+      margin: 10px auto;
       display: none;
-      border-radius: 8px;
-      overflow: hidden;
-      position: relative;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
-      background: #000;
-      z-index: 80;
-    }
-    #reader video, #reader canvas, #reader .html5-qrcode-viewport, #reader .html5-qrcode-scanner {
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
-    }
-    #reader .html5-qrcode-button, #reader .html5-qrcode-status, #reader .html5-qrcode-button-svg {
-      display: none !important;
     }
 
     .tables {
@@ -113,7 +131,8 @@
       justify-content: space-between;
       align-items: flex-start;
       margin-top: 16px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
     }
     .col {
       width: 48%;
@@ -122,6 +141,7 @@
       border-radius: 8px;
       box-shadow: 0 1px 6px rgba(0,0,0,0.04);
       box-sizing: border-box;
+      min-width: 460px;
     }
 
     table {
@@ -145,126 +165,132 @@
 
     table th:nth-child(1), table td:nth-child(1) { width: 30%; }
     table th:nth-child(2), table td:nth-child(2) { width: 18%; }
-    table th:nth-child(3), table td:nth-child(3) { width: 18%; }
-    table th:nth-child(4), table td:nth-child(4) { width: 14%; }
+    table th:nth-child(3), table td:nth-child(3) { width: 14%; }
+    table th:nth-child(4), table td:nth-child(4) { width: 18%; }
     table th:nth-child(5), table td:nth-child(5) { width: 20%; }
 
-    .addBtn { background: #198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-    .delBtn { background: var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-    #clearAllBtn { background: var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
+    .addBtn { background: #198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; margin-left:6px; }
+    .delBtn { background: var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; margin-left:6px; }
+    #clearAllBtn, #clearResultsAllBtn { background: var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
+    #exportBtn { background: #0d6efd; color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-left:8px; }
 
-    .muted { color: var(--muted); font-size: 13px; }
-
-    .flash { background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 6px; display: inline-block; }
-
-    #modalOverlay {
+    #receiveModal {
       position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
+      left: 0; right: 0; top: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 200;
     }
-    #modal {
+    #receiveBox {
+      width: 420px;
+      max-width: 95%;
       background: var(--card-bg);
-      padding: 16px;
+      padding: 14px;
       border-radius: 10px;
-      width: 320px;
-      max-width: 92%;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.18);
       text-align: center;
     }
-    #modal h4 { margin: 0 0 8px 0; }
-    #modal input[type="number"] {
+    #receiveInput {
       width: 100%;
       padding: 10px;
+      font-size: 20px;
+      text-align: center;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+    .numpad-recv {
+      width: 320px;
+      margin: 12px auto 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .numpad-recv button {
+      padding: 12px;
       font-size: 18px;
       border-radius: 8px;
-      border: 1px solid #ddd;
-      box-sizing: border-box;
-      text-align: center;
+      border: 1px solid #ccc;
+      background: #f3f3f3;
+      cursor: pointer;
     }
-    #modal .modal-actions { margin-top: 10px; display:flex; gap:8px; justify-content:center; }
-    #modal .modal-actions button { padding: 8px 12px; border-radius:8px; border:none; cursor:pointer; }
-    #modal .confirm { background: var(--primary); color:#fff; }
-    #modal .cancel { background: #e9ecef; }
-
-    .no-value { opacity: 0.6; }
-
-    #readerStatus {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.55);
-      color: #fff;
-      font-size: 12px;
-      padding: 4px 6px;
-      text-align: center;
-      display: none;
-      z-index: 90;
-    }
-
-    @media (max-width: 900px) {
-      .tables { flex-direction: column; }
-      .col { width: 100%; }
-      #reader { width: 88px; }
-      #searchBar { width: 85%; }
-    }
+    .modal-actions { margin-top: 10px; display:flex; gap:8px; justify-content:center; }
   </style>
 </head>
 <body>
-  <h2>بحث في المنتجات</h2>
+  <h2>استلام المنتجات</h2>
 
   <div id="status" class="inactive">لا يوجد ملف فعال</div>
+
+  <div id="loginBox" aria-live="polite">
+    <input id="passwordInput" type="password" placeholder="ادخل كلمة المرور" aria-label="كلمة المرور">
+    <div class="numpad" style="margin-top:12px;">
+      <button onclick="pressDigit('1')">1</button>
+      <button onclick="pressDigit('2')">2</button>
+      <button onclick="pressDigit('3')">3</button>
+      <button onclick="pressDigit('4')">4</button>
+      <button onclick="pressDigit('5')">5</button>
+      <button onclick="pressDigit('6')">6</button>
+      <button onclick="pressDigit('7')">7</button>
+      <button onclick="pressDigit('8')">8</button>
+      <button onclick="pressDigit('9')">9</button>
+      <button onclick="backspacePass()">⌫</button>
+      <button onclick="pressDigit('0')">0</button>
+      <button onclick="submitPass()">⏎</button>
+    </div>
+    <div id="passError" role="alert" aria-live="assertive"></div>
+  </div>
 
   <div id="app">
     <div class="searchRow" role="region" aria-label="شريط البحث">
       <input id="searchBar" type="text" placeholder="اكتب الاسم أو الباركود أو وصف المنتج" aria-label="بحث">
-      <button id="searchBtn" class="btn primary">بحث</button>
-      <button id="clearBtn" class="btn ghost">حذف</button>
-      <button id="cameraBtn" class="btn camera" title="فتح الكاميرا">📷</button>
-      <button id="scaleBtn" class="btn camera">📶 كود الميزان</button>
+      <button id="searchBtn" class="btn primary" onclick="search(false)">بحث</button>
+      <button id="clearBtn" class="btn ghost" onclick="clearSearch()">حذف</button>
+      <button id="cameraBtn" class="btn camera" onclick="toggleScanner('qr')">📷 QR</button>
+      <button id="scaleBtn" class="btn camera" onclick="toggleScaleFilter()">📶 كود الميزان</button>
     </div>
 
-    <div id="reader" aria-hidden="true">
-      <div id="readerStatus"></div>
-    </div>
+    <div id="reader" aria-hidden="true"></div>
 
     <div class="tables">
       <div class="col" aria-label="نتائج البحث">
-        <h3>سجل الاستلام (نتائج البحث)</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">نتائج البحث</h3>
+          <div>
+            <button id="clearResultsAllBtn" onclick="clearAllResults()">حذف الكل</button>
+          </div>
+        </div>
         <table id="results" aria-live="polite">
           <thead>
             <tr>
               <th>اسم المنتج</th>
-              <th>سعر المنتج</th>
               <th>كود الميزان</th>
-              <th>الكمية</th>
+              <th>العدد</th>
+              <th>QR Code</th>
               <th>إجراء</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
-        <div style="margin-top:8px; text-align:left;">
-          <button id="moveAllBtn" class="btn primary" style="display:inline-block;">نقل الكل</button>
-        </div>
       </div>
 
       <div class="col" aria-label="المنتجات المختارة">
-        <h3>المنتجات المكتملة</h3>
-        <div style="text-align:left; margin-bottom:6px;">
-          <button id="clearAllBtn" onclick="clearAllSelected()">حذف الكل</button>
-          <button id="exportBtn" class="btn primary" style="margin-left:8px;">تصدير Excel</button>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">المنتجات المختارة</h3>
+          <div>
+            <button id="exportBtn" onclick="exportFinalToExcel()">تصدير إكسل</button>
+            <button id="clearAllBtn" onclick="clearAllSelected()">حذف الكل</button>
+          </div>
         </div>
         <table id="finalResults" aria-live="polite">
           <thead>
             <tr>
               <th>اسم المنتج</th>
-              <th>سعر المنتج</th>
               <th>كود الميزان</th>
-              <th>الكمية</th>
+              <th>العدد</th>
+              <th>QR Code</th>
               <th>إجراء</th>
             </tr>
           </thead>
@@ -274,307 +300,237 @@
     </div>
   </div>
 
-  <div id="modalOverlay" aria-hidden="true">
-    <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <h4 id="modalTitle">أدخل الكمية (كجم)</h4>
-      <input id="modalInput" type="number" min="0" step="0.001" placeholder="مثال: 0.250">
-      <div style="margin-top:8px; font-size:13px; color:var(--muted);" id="modalNote">اضغط تأكيد لحفظ الكمية</div>
+  <div id="receiveModal" role="dialog" aria-modal="true">
+    <div id="receiveBox">
+      <div id="receiveTitle" style="font-weight:700; margin-bottom:8px;">استلام المنتج</div>
+      <input id="receiveInput" placeholder="ادخل العدد أو الوزن" inputmode="decimal" autocomplete="off">
+      <div class="numpad-recv" aria-hidden="false">
+        <button onclick="recvPress('1')">1</button>
+        <button onclick="recvPress('2')">2</button>
+        <button onclick="recvPress('3')">3</button>
+        <button onclick="recvPress('4')">4</button>
+        <button onclick="recvPress('5')">5</button>
+        <button onclick="recvPress('6')">6</button>
+        <button onclick="recvPress('7')">7</button>
+        <button onclick="recvPress('8')">8</button>
+        <button onclick="recvPress('9')">9</button>
+        <button onclick="recvBackspace()">⌫</button>
+        <button onclick="recvPress('0')">0</button>
+        <button onclick="recvDot()">.</button>
+      </div>
       <div class="modal-actions">
-        <button id="confirmModal" class="confirm">تأكيد</button>
-        <button id="cancelModal" class="cancel">إلغاء</button>
+        <button class="btn ghost" onclick="closeReceiveModal()">إلغاء</button>
+        <button class="btn primary" onclick="confirmReceive()">تم</button>
       </div>
     </div>
   </div>
 
   <script>
-    // متغيرات عامة
     let excelData = [];
     let qrScanner = null;
     let scanningMode = null;
     let scaleFilterActive = false;
-    let lastScan = { text: null, time: 0 };
-    const SCAN_DEBOUNCE_MS = 800;
+    const correctPassword = "10100";
 
-    // عناصر
     const statusEl = document.getElementById('status');
+    const loginBox = document.getElementById('loginBox');
+    const passwordInput = document.getElementById('passwordInput');
+    const passErrorBox = document.getElementById('passError');
+    const app = document.getElementById('app');
+
     const searchBar = document.getElementById('searchBar');
     const resultsTbody = document.querySelector('#results tbody');
     const finalTbody = document.querySelector('#finalResults tbody');
     const reader = document.getElementById('reader');
-    const readerStatus = document.getElementById('readerStatus');
     const clearAllBtnEl = document.getElementById('clearAllBtn');
+    const clearResultsAllBtnEl = document.getElementById('clearResultsAllBtn');
     const scaleBtnEl = document.getElementById('scaleBtn');
-    const cameraBtnEl = document.getElementById('cameraBtn');
 
-    const modalOverlay = document.getElementById('modalOverlay');
-    const modalInput = document.getElementById('modalInput');
-    const confirmModalBtn = document.getElementById('confirmModal');
-    const cancelModalBtn = document.getElementById('cancelModal');
+    const receiveModal = document.getElementById('receiveModal');
+    const receiveInput = document.getElementById('receiveInput');
+    const receiveTitle = document.getElementById('receiveTitle');
 
-    const moveAllBtn = document.getElementById('moveAllBtn');
-    const exportBtn = document.getElementById('exportBtn');
+    let pendingReceive = null;
 
-    // تهيئة: حاول قراءة ملف الإكسل من المسار المحلي ثم من raw.githubusercontent كاحتياط
-    async function loadExcel() {
-      const candidates = [
-        'product.template(176).xlsx',
-        'product.template.xlsx',
-        'https://raw.githubusercontent.com/abdalam142/002/main/product.template(176).xlsx',
-        'https://raw.githubusercontent.com/abdalam142/002/main/product.template.xlsx'
-      ];
-
-      for (const url of candidates) {
+    fetch("product.template(176).xlsx")
+      .then(res => res.arrayBuffer())
+      .then(data => {
         try {
-          const u = encodeURI(url);
-          const res = await fetch(u);
-          if (!res.ok) {
-            // جرب التالي
-            continue;
+          const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+          const firstSheet = workbook.SheetNames[0];
+          excelData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { header: 1 });
+          statusEl.textContent = "ملف فعال";
+          statusEl.className = "active";
+        } catch (err) {
+          console.error("خطأ قراءة الإكسل:", err);
+          statusEl.textContent = "ملف غير صالح";
+          statusEl.className = "inactive";
+        }
+      })
+      .catch(err => {
+        console.warn("لم يتم العثور على ملف الإكسل:", err);
+        statusEl.textContent = "لا يوجد ملف فعال";
+        statusEl.className = "inactive";
+      });
+
+    passwordInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitPass();
+      } else {
+        clearError();
+      }
+    });
+    passwordInput.addEventListener('input', function() { clearError(); });
+
+    function pressDigit(d) {
+      passwordInput.value = (passwordInput.value || "") + d;
+      clearError();
+    }
+    function backspacePass() {
+      passwordInput.value = (passwordInput.value || "").slice(0, -1);
+      clearError();
+    }
+    function submitPass() {
+      if ((passwordInput.value || "") === correctPassword) {
+        loginBox.style.display = "none";
+        app.style.display = "block";
+        clearError();
+        setTimeout(() => { if (searchBar) searchBar.focus(); }, 150);
+      } else {
+        showError("كلمة المرور غير صحيحة");
+      }
+    }
+    function showError(msg) {
+      if (!passErrorBox) return;
+      passErrorBox.textContent = msg;
+      passErrorBox.style.display = "block";
+    }
+    function clearError() {
+      if (!passErrorBox) return;
+      passErrorBox.textContent = "";
+      passErrorBox.style.display = "none";
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (app.style.display === 'block') {
+        if (e.key === 'Enter') {
+          if (document.activeElement === passwordInput) return;
+          e.preventDefault();
+          search(false);
+        } else if (e.key === 'Delete') {
+          if (finalTbody && finalTbody.rows.length > 0) {
+            finalTbody.deleteRow(finalTbody.rows.length - 1);
+            checkClearAllVisibility();
           }
-          const buf = await res.arrayBuffer();
-          try {
-            const workbook = XLSX.read(new Uint8Array(buf), { type: 'array' });
-            const firstSheet = workbook.SheetNames[0];
-            excelData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { header: 1 });
-            statusEl.textContent = 'ملف فعال (' + url.split('/').pop() + ')';
-            statusEl.className = 'active';
-            console.log('Excel loaded from', url);
-            return true;
-          } catch (err) {
-            console.warn('خطأ قراءة إكسل من', url, err);
-          }
-        } catch (e) {
-          console.warn('fetch failed for', url, e);
         }
       }
-      statusEl.textContent = 'لا يوجد ملف فعال';
-      statusEl.className = 'inactive';
-      excelData = [];
-      return false;
-    }
+    });
 
-    loadExcel();
-
-    // مساعدات
-    function setReaderStatus(msg, show = true) {
-      if (!readerStatus) return;
-      readerStatus.textContent = msg || '';
-      readerStatus.style.display = show && msg ? 'block' : 'none';
-    }
-
-    function flashRowMessage(row, msg) {
-      const cell = document.createElement('td');
-      cell.colSpan = row.children.length || 5;
-      cell.className = 'flash';
-      cell.textContent = msg;
-      const tr = document.createElement('tr');
-      tr.appendChild(cell);
-      row.parentElement.insertBefore(tr, row.nextSibling);
-      setTimeout(() => tr.remove(), 1200);
-    }
-
-    // البحث
-    function search(fromScanner = false, value = '') {
+    function search(fromScanner = false, scannerType = '', value = '') {
       const query = fromScanner ? (value + "").trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
       if (!query) {
         if (fromScanner) {
           searchBar.value = "";
           searchBar.dispatchEvent(new Event('input'));
         }
-        return [];
+        return;
       }
-      if (!Array.isArray(excelData) || excelData.length === 0) return [];
+      if (!Array.isArray(excelData) || excelData.length === 0) return;
 
       resultsTbody.innerHTML = "";
-      const matches = [];
+      const seenResultsIds = new Set();
+      let warnedDuplicate = false;
 
       excelData.forEach((row, idx) => {
         if (idx === 0) return;
         const name = (row[0] || "").toString();
-        const price = (row[1] || "").toString();
-        const code = (row[2] || "").toString();
-        const qr = (row[3] || "").toString();
+        const code = (row[2] || "").toString().toLowerCase();
+        const qr = (row[3] || "").toString().toLowerCase();
 
-        const a = name.toLowerCase();
-        const c = code.toLowerCase();
-        const d = qr.toLowerCase();
+        if (name.toLowerCase().includes(query) || code.includes(query) || qr.includes(query)) {
+          const id = (qr && qr !== "") ? qr : (code && code !== "") ? code : name.toLowerCase();
+          if (seenResultsIds.has(id)) {
+            if (!warnedDuplicate) {
+              alert('تم العثور على نفس المنتج أكثر من مرة في المصدر. سيتم عرض نسخة واحدة فقط.');
+              warnedDuplicate = true;
+            }
+            return;
+          }
+          seenResultsIds.add(id);
 
-        if (a.includes(query) || c.includes(query) || d.includes(query)) {
           const tr = document.createElement('tr');
-
-          const td0 = document.createElement('td'); td0.textContent = name; tr.appendChild(td0);
-          const td1 = document.createElement('td'); td1.textContent = price; tr.appendChild(td1);
-          const td2 = document.createElement('td'); td2.textContent = code; tr.appendChild(td2);
-          const tdQty = document.createElement('td'); tdQty.textContent = ""; tdQty.className = "no-value"; tr.appendChild(tdQty);
+          const td0 = document.createElement('td'); td0.textContent = row[0] || ""; tr.appendChild(td0);
+          const td1 = document.createElement('td'); td1.textContent = row[2] || ""; tr.appendChild(td1);
+          const td2 = document.createElement('td'); td2.textContent = ""; tr.appendChild(td2);
+          const td3 = document.createElement('td'); td3.textContent = row[3] || ""; tr.appendChild(td3);
 
           const tdAction = document.createElement('td');
-
-          const receiveBtn = document.createElement('button');
-          receiveBtn.className = 'addBtn';
-          receiveBtn.textContent = 'استلام';
-          receiveBtn.addEventListener('click', () => {
-            openQtyModalForRow(tr, { name, price, code, qr, rowIndex: idx });
+          const recvBtn = document.createElement('button');
+          recvBtn.className = 'addBtn';
+          recvBtn.textContent = 'استلام';
+          recvBtn.addEventListener('click', function() {
+            openReceiveModal({rowData: row, sourceTr: tr});
           });
-          tdAction.appendChild(receiveBtn);
+          tdAction.appendChild(recvBtn);
 
-          const moveBtn = document.createElement('button');
-          moveBtn.className = 'btn ghost';
-          moveBtn.textContent = 'نقل';
-          moveBtn.disabled = true;
-          moveBtn.style.marginLeft = '6px';
-          moveBtn.addEventListener('click', () => {
-            moveRowToCompleted(tr);
+          const delBtn = document.createElement('button');
+          delBtn.className = 'delBtn';
+          delBtn.textContent = 'حذف';
+          delBtn.addEventListener('click', function() {
+            tr.remove();
+            checkClearResultsVisibility();
           });
-          tdAction.appendChild(moveBtn);
+          tdAction.appendChild(delBtn);
 
           tr.appendChild(tdAction);
           resultsTbody.appendChild(tr);
-
-          matches.push({ tr, data: { name, price, code, qr, rowIndex: idx }, moveBtn, tdQty });
-
-          const exactMatch = fromScanner && ((d && d === query) || (c && c === query));
-          if (exactMatch) {
-            setTimeout(() => openQtyModalForRow(tr, { name, price, code, qr, rowIndex: idx }), 80);
-          }
         }
       });
 
-      if (scaleFilterActive) applyScaleFilterToTable(resultsTbody);
+      if (scaleFilterActive) {
+        applyScaleFilterToTable(resultsTbody);
+      }
 
       if (fromScanner) {
         searchBar.value = "";
         searchBar.dispatchEvent(new Event('input'));
       }
-
-      return matches;
+      checkClearResultsVisibility();
     }
 
     function clearSearch() {
       searchBar.value = "";
       resultsTbody.innerHTML = "";
+      checkClearResultsVisibility();
     }
 
-    // فلتر الميزان
-    function toggleScaleFilter() {
-      scaleFilterActive = !scaleFilterActive;
-      scaleBtnEl.classList.toggle('scale-active', scaleFilterActive);
-      applyScaleFilterToTable(resultsTbody);
-      applyScaleFilterToTable(finalTbody);
-      checkClearAllVisibility();
-    }
+    function addToFinalWithQty(row, qty) {
+      const qrVal = (row[3] || "").toString();
+      const codeVal = (row[2] || "").toString();
 
-    function applyScaleFilterToTable(tbody) {
-      if (!tbody) return;
-      const rows = Array.from(tbody.rows);
-      rows.forEach(row => {
-        const cell = row.cells[2];
-        const val = cell ? (cell.textContent || "").trim() : "";
-        row.style.display = (scaleFilterActive && val === "") ? 'none' : '';
-      });
-    }
-
-    // modal إدارة
-    let currentModalRow = null;
-    let currentModalData = null;
-
-    function openQtyModalForRow(rowElement, dataObj) {
-      currentModalRow = rowElement;
-      currentModalData = dataObj;
-      modalOverlay.style.display = 'flex';
-      modalOverlay.setAttribute('aria-hidden', 'false');
-
-      const qtyCell = rowElement.cells[3];
-      const existing = (qtyCell && qtyCell.dataset && qtyCell.dataset.qty) ? qtyCell.dataset.qty : '';
-      modalInput.value = existing || '';
-      setTimeout(() => modalInput.focus(), 80);
-    }
-
-    function closeModal() {
-      modalOverlay.style.display = 'none';
-      modalOverlay.setAttribute('aria-hidden', 'true');
-      currentModalRow = null;
-      currentModalData = null;
-      modalInput.value = '';
-    }
-
-    confirmModalBtn.addEventListener('click', () => {
-      if (!currentModalRow) { closeModal(); return; }
-      const v = modalInput.value;
-      const num = parseFloat(v);
-      const qtyCell = currentModalRow.cells[3];
-      if (!v || isNaN(num) || num <= 0) {
-        qtyCell.textContent = "";
-        qtyCell.classList.add('no-value');
-        const moveBtn = getMoveButtonFromRow(currentModalRow);
-        if (moveBtn) { moveBtn.disabled = true; }
-        closeModal();
-        return;
+      let existingRow = null;
+      for (let i = 0; i < finalTbody.rows.length; i++) {
+        const fr = finalTbody.rows[i];
+        const rQr = (fr.cells[3] && fr.cells[3].textContent) || "";
+        const rCode = (fr.cells[1] && fr.cells[1].textContent) || "";
+        if ((qrVal && rQr === qrVal && qrVal !== "") || (codeVal && rCode === codeVal && codeVal !== "")) {
+          existingRow = fr;
+          break;
+        }
       }
 
-      const codeVal = (currentModalData.code || "") + "";
-      const qrVal = (currentModalData.qr || "") + "";
-
-      const existsInFinal = Array.from(finalTbody.rows).some(r => {
-        const rCode = (r.cells[2] && r.cells[2].textContent) || "";
-        return (rCode === codeVal && codeVal !== "");
-      });
-      if (existsInFinal) {
-        flashRowMessage(currentModalRow, 'مكرر في المكتمل');
-        closeModal();
-        return;
+      if (existingRow) {
+        existingRow.cells[2].textContent = qty || "";
+        checkClearAllVisibility();
+        return true;
       }
 
-      qtyCell.dataset.qty = String(num);
-      qtyCell.textContent = num + " كجم";
-      qtyCell.classList.remove('no-value');
-
-      const moveBtn = getMoveButtonFromRow(currentModalRow);
-      if (moveBtn) { moveBtn.disabled = false; }
-
-      closeModal();
-    });
-
-    cancelModalBtn.addEventListener('click', () => {
-      closeModal();
-    });
-
-    function getMoveButtonFromRow(tr) {
-      if (!tr) return null;
-      const actionCell = tr.cells[tr.cells.length - 1];
-      if (!actionCell) return null;
-      const buttons = actionCell.querySelectorAll('button');
-      return buttons && buttons[1] ? buttons[1] : null;
-    }
-
-    // نقل
-    function moveRowToCompleted(tr) {
-      if (!tr) return false;
-      const qtyCell = tr.cells[3];
-      const qtyVal = qtyCell && qtyCell.dataset ? qtyCell.dataset.qty : null;
-      if (!qtyVal) {
-        flashRowMessage(tr, 'أدخل كمية صحيحة أولاً');
-        return false;
-      }
-
-      const name = tr.cells[0].textContent || "";
-      const price = tr.cells[1].textContent || "";
-      const code = tr.cells[2].textContent || "";
-      const qty = qtyVal;
-
-      const exists = Array.from(finalTbody.rows).some(r => {
-        const rCode = (r.cells[2] && r.cells[2].textContent) || "";
-        return (rCode === code && code !== "");
-      });
-      if (exists) {
-        flashRowMessage(tr, 'مكرر');
-        return false;
-      }
-
-      const trf = document.createElement('tr');
-      const td0 = document.createElement('td'); td0.textContent = name; trf.appendChild(td0);
-      const td1 = document.createElement('td'); td1.textContent = price; trf.appendChild(td1);
-      const td2 = document.createElement('td'); td2.textContent = code; trf.appendChild(td2);
-      const td3 = document.createElement('td'); td3.textContent = qty + " كجم"; td3.dataset.qty = qty; trf.appendChild(td3);
+      const tr = document.createElement('tr');
+      const td0 = document.createElement('td'); td0.textContent = row[0] || ""; tr.appendChild(td0);
+      const td1 = document.createElement('td'); td1.textContent = row[2] || ""; tr.appendChild(td1);
+      const td2 = document.createElement('td'); td2.textContent = qty || ""; tr.appendChild(td2);
+      const td3 = document.createElement('td'); td3.textContent = row[3] || ""; tr.appendChild(td3);
 
       const tdDel = document.createElement('td');
       const delBtn = document.createElement('button');
@@ -585,23 +541,14 @@
         checkClearAllVisibility();
       });
       tdDel.appendChild(delBtn);
-      trf.appendChild(tdDel);
+      tr.appendChild(tdDel);
 
-      finalTbody.appendChild(trf);
+      finalTbody.appendChild(tr);
       checkClearAllVisibility();
 
-      tr.remove();
-      return true;
-    }
+      if (scaleFilterActive) applyScaleFilterToTable(finalTbody);
 
-    function moveAllToCompleted() {
-      const rows = Array.from(resultsTbody.rows);
-      rows.forEach(row => {
-        const qty = row.cells[3] && row.cells[3].dataset ? row.cells[3].dataset.qty : null;
-        if (qty) {
-          moveRowToCompleted(row);
-        }
-      });
+      return true;
     }
 
     function clearAllSelected() {
@@ -613,4 +560,52 @@
       if (!finalTbody || finalTbody.rows.length === 0) {
         clearAllBtnEl.style.display = 'none';
       } else {
-        clearAllBtnEl.style.display = 'in
+        clearAllBtnEl.style.display = 'inline-block';
+      }
+    }
+
+    function clearAllResults() {
+      resultsTbody.innerHTML = "";
+      checkClearResultsVisibility();
+    }
+
+    function checkClearResultsVisibility() {
+      if (!resultsTbody || resultsTbody.rows.length === 0) {
+        clearResultsAllBtnEl.style.display = 'none';
+      } else {
+        clearResultsAllBtnEl.style.display = 'inline-block';
+      }
+    }
+
+    function toggleScaleFilter() {
+      scaleFilterActive = !scaleFilterActive;
+      scaleBtnEl.classList.toggle('scale-active', scaleFilterActive);
+      applyScaleFilterToTable(resultsTbody);
+      applyScaleFilterToTable(finalTbody);
+      checkClearAllVisibility();
+      checkClearResultsVisibility();
+    }
+
+    function applyScaleFilterToTable(tbody) {
+      if (!tbody) return;
+      const rows = Array.from(tbody.rows);
+      rows.forEach(row => {
+        const cell = row.cells[1];
+        const val = cell ? (cell.textContent || "").trim() : "";
+        row.style.display = (scaleFilterActive && val === "") ? 'none' : '';
+      });
+    }
+
+    function openReceiveModal({rowData, sourceTr}) {
+      pendingReceive = { rowData, sourceTr, updateExisting: null };
+      const codeVal = (rowData[2] || "").toString();
+      if (codeVal && codeVal.trim() !== "") {
+        receiveTitle.textContent = 'أدخل الوزن (كجم)';
+        receiveInput.placeholder = 'الوزن بالكيلو جرام';
+      } else {
+        receiveTitle.textContent = 'أدخل العدد';
+        receiveInput.placeholder = 'العدد';
+      }
+
+      const qrVal = (rowData[3] || "").toString();
+      const code = (ro
