@@ -119,16 +119,17 @@
       border: none;
       cursor: pointer;
       font-size: 15px;
+      height: 40px;
+      line-height: 18px;
     }
     .btn.primary { background: var(--primary); color: #fff; }
     .btn.ghost { background: #e9ecef; }
-    .btn.camera { background: var(--accent); color: #fff; }
-    .btn.scale-active { background: #ffc107; color: #111; }
+    .btn.camera { background: var(--accent); color: #fff; display:inline-flex; align-items:center; justify-content:center; }
 
-    /* قارئ QR - صغير وموجود في أقصى اليسار العلوي */
+    /* قارئ QR - صغير جداً: مربع حوالي ضعف زر الكاميرا (~88px) */
     #reader {
-      width: 160px;
-      height: 120px;
+      width: 88px;
+      height: 88px;
       position: fixed;
       top: 12px;
       left: 12px;
@@ -141,19 +142,23 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.12);
       overflow: hidden;
     }
-    /* ضبط عناصر video/canvas داخل html5-qrcode ليطابق حجم الحاوية الصغيرة */
-    #reader .html5-qrcode-video, 
+    /* فرض أحجام صغيرة على عناصر html5-qrcode الداخليه */
+    #reader .html5-qrcode, 
+    #reader .html5-qrcode-element, 
+    #reader .html5-qrcode-region, 
+    #reader .html5-qrcode-region .html5-qrcode-video,
     #reader video, 
     #reader canvas {
       width: 100% !important;
       height: 100% !important;
+      max-width: 88px !important;
+      max-height: 88px !important;
       object-fit: cover;
       display: block;
     }
-    #reader .html5-qrcode-region {
-      width: 100% !important;
-      height: 100% !important;
-    }
+    /* إخفاء نص/أزرار زائدة داخل مكتبة عند الحاجة */
+    #reader .html5-qrcode-button-camera, 
+    #reader .html5-qrcode-status { display: none !important; }
 
     .tables {
       display: flex;
@@ -250,7 +255,7 @@
     @media (max-width: 900px) {
       .tables { flex-direction: column; }
       .col { width: 100%; }
-      #reader { width: calc(100% - 24px); left: 12px; right: 12px; top: 12px; height: 220px; }
+      #reader { width: 88px; left: 12px; right: auto; top: 12px; height: 88px; }
       #searchBar { width: 85%; }
     }
   </style>
@@ -289,7 +294,7 @@
       <input id="searchBar" type="text" placeholder="اكتب الاسم أو الباركود أو وصف المنتج" aria-label="بحث">
       <button id="searchBtn" class="btn primary" onclick="search(false)">بحث</button>
       <button id="clearBtn" class="btn ghost" onclick="clearSearch()">حذف</button>
-      <button id="cameraBtn" class="btn camera" onclick="toggleScanner()">📷 كاميرا</button>
+      <button id="cameraBtn" class="btn camera" onclick="toggleScanner()">📷</button>
       <button id="moveAllBtn" class="btn" style="background:#0b5ed7;color:#fff;" onclick="moveAllToCompleted()">نقل كل المنتجات</button>
     </div>
 
@@ -560,10 +565,4 @@
 
     function clearSearch() {
       searchBar.value = "";
-      resultsTbody.innerHTML = "";
-    }
-
-    /**************************************************************************
-     * لوحة رقمية منبثقة لإدخال الكمية/الوزن (القيمة تعرض دائماً بالكجم)
-     **************************************************************************/
-    fun
+      resultsTbody.i
