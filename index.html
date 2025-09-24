@@ -1,14 +1,8 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<!DOCTYPE html><html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=1024" />
-  <title>استلام المنتجات</title>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>
-
-  <style>
+  <title>بحث في المنتجات</title>  <!-- مكتبات -->  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>  <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>  <style>
     :root {
       --card-bg: #ffffff;
       --muted: #6c757d;
@@ -28,6 +22,7 @@
     }
     h2 { text-align: center; margin: 6px 0 12px; }
 
+    /* مؤشر حالة ملف الإكسل */
     #status {
       position: fixed;
       top: 12px;
@@ -41,6 +36,7 @@
     #status.active { background: var(--success); }
     #status.inactive { background: var(--danger); }
 
+    /* شاشة الباسورد */
     #loginBox {
       background: var(--card-bg);
       padding: 14px;
@@ -88,6 +84,7 @@
       box-sizing: border-box;
     }
 
+    /* التطبيق */
     #app {
       display: none;
       margin-top: 14px;
@@ -131,8 +128,7 @@
       justify-content: space-between;
       align-items: flex-start;
       margin-top: 16px;
-      flex-wrap: nowrap;
-      overflow-x: auto;
+      flex-wrap: wrap;
     }
     .col {
       width: 48%;
@@ -141,7 +137,6 @@
       border-radius: 8px;
       box-shadow: 0 1px 6px rgba(0,0,0,0.04);
       box-sizing: border-box;
-      min-width: 460px;
     }
 
     table {
@@ -163,69 +158,38 @@
       vertical-align: middle;
     }
 
-    table th:nth-child(1), table td:nth-child(1) { width: 30%; }
+    /* أعمدة بعرض ثابت (نسب) */
+    table th:nth-child(1), table td:nth-child(1) { width: 36%; }
     table th:nth-child(2), table td:nth-child(2) { width: 18%; }
-    table th:nth-child(3), table td:nth-child(3) { width: 14%; }
-    table th:nth-child(4), table td:nth-child(4) { width: 18%; }
-    table th:nth-child(5), table td:nth-child(5) { width: 20%; }
+    table th:nth-child(3), table td:nth-child(3) { width: 18%; }
+    table th:nth-child(4), table td:nth-child(4) { width: 28%; }
 
-    .addBtn { background: #198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; margin-left:6px; }
-    .delBtn { background: var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; margin-left:6px; }
-    #clearAllBtn, #clearResultsAllBtn { background: var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
-    #exportBtn { background: #0d6efd; color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-left:8px; }
+    .addBtn { background: #198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    .delBtn { background: var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    .smallBtn { padding:6px 8px; border-radius:6px; border:none; cursor:pointer; }
+    #clearAllBtn { background: var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
+    #clearResultsBtn { background: var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
+    #exportBtn { background: var(--primary); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; }
 
-    #receiveModal {
-      position: fixed;
-      left: 0; right: 0; top: 0; bottom: 0;
-      background: rgba(0,0,0,0.4);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 200;
+    /* المودال */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal { background: #fff; border-radius: 10px; padding: 16px; width: 360px; max-width: 95%; box-sizing: border-box; }
+    .modal h4 { margin: 0 0 10px; text-align: center; }
+    .modal .modal-input { width: 100%; padding: 10px; font-size: 20px; text-align: center; border: 1px solid #ddd; border-radius: 8px; }
+    .modal .numpad-modal { margin-top: 12px; display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+    .modal .numpad-modal button { padding: 12px; font-size: 18px; border-radius: 8px; border: 1px solid #ccc; background: #f3f3f3; cursor: pointer; }
+    .modal .modal-actions { margin-top: 12px; display:flex; gap:8px; justify-content: center; }
+
+    @media (max-width: 900px) {
+      .tables { flex-direction: column; }
+      .col { width: 100%; }
+      #reader { width: 100%; }
+      #searchBar { width: 85%; }
     }
-    #receiveBox {
-      width: 420px;
-      max-width: 95%;
-      background: var(--card-bg);
-      padding: 14px;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.18);
-      text-align: center;
-    }
-    #receiveInput {
-      width: 100%;
-      padding: 10px;
-      font-size: 20px;
-      text-align: center;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      box-sizing: border-box;
-    }
-    .numpad-recv {
-      width: 320px;
-      margin: 12px auto 0;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-    .numpad-recv button {
-      padding: 12px;
-      font-size: 18px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      background: #f3f3f3;
-      cursor: pointer;
-    }
-    .modal-actions { margin-top: 10px; display:flex; gap:8px; justify-content:center; }
-  </style>
-</head>
+  </style></head>
 <body>
-  <h2>استلام المنتجات</h2>
-
-  <div id="status" class="inactive">لا يوجد ملف فعال</div>
-
-  <div id="loginBox" aria-live="polite">
-    <input id="passwordInput" type="password" placeholder="ادخل كلمة المرور" aria-label="كلمة المرور" autofocus inputmode="numeric" />
+  <h2>بحث في المنتجات</h2>  <!-- مؤشر حالة ملف الإكسل -->  <div id="status" class="inactive">جاري تحميل الإكسل...</div>  <!-- شاشة الباسورد -->  <div id="loginBox" aria-live="polite">
+    <input id="passwordInput" type="password" placeholder="ادخل كلمة المرور" aria-label="كلمة المرور">
     <div class="numpad" style="margin-top:12px;">
       <button onclick="pressDigit('1')">1</button>
       <button onclick="pressDigit('2')">2</button>
@@ -239,99 +203,102 @@
       <button onclick="backspacePass()">⌫</button>
       <button onclick="pressDigit('0')">0</button>
       <button onclick="submitPass()">⏎</button>
-    </div>
-    <div id="passError" role="alert" aria-live="assertive"></div>
-  </div>
+    </div><!-- رسالة الخطأ داخل الصفحة -->
+<div id="passError" role="alert" aria-live="assertive"></div>
 
-  <div id="app">
+  </div>  <!-- التطبيق -->  <div id="app">
     <div class="searchRow" role="region" aria-label="شريط البحث">
       <input id="searchBar" type="text" placeholder="اكتب الاسم أو الباركود أو وصف المنتج" aria-label="بحث">
       <button id="searchBtn" class="btn primary" onclick="search(false)">بحث</button>
       <button id="clearBtn" class="btn ghost" onclick="clearSearch()">حذف</button>
       <button id="cameraBtn" class="btn camera" onclick="toggleScanner('qr')">📷 QR</button>
       <button id="scaleBtn" class="btn camera" onclick="toggleScaleFilter()">📶 كود الميزان</button>
+    </div><!-- قارئ QR يظهر هنا -->
+<div id="reader" aria-hidden="true"></div>
+
+<div class="tables">
+  <!-- جدول نتائج البحث (يمين) -->
+  <div class="col" aria-label="نتائج البحث">
+    <h3>نتائج البحث</h3>
+    <div style="text-align:left; margin-bottom:6px;">
+      <button id="clearResultsBtn" onclick="clearResults()">حذف الكل</button>
     </div>
-
-    <div id="reader" aria-hidden="true"></div>
-
-    <div class="tables">
-      <div class="col" aria-label="نتائج البحث">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">نتائج البحث</h3>
-          <div>
-            <button id="clearResultsAllBtn" onclick="clearAllResults()">حذف الكل</button>
-          </div>
-        </div>
-        <table id="results" aria-live="polite">
-          <thead>
-            <tr>
-              <th>اسم المنتج</th>
-              <th>كود الميزان</th>
-              <th>العدد</th>
-              <th>QR Code</th>
-              <th>إجراء</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <div class="col" aria-label="المنتجات المختارة">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">المنتجات المختارة</h3>
-          <div>
-            <button id="exportBtn" onclick="exportFinalToExcel()">تصدير إكسل</button>
-            <button id="clearAllBtn" onclick="clearAllSelected()">حذف الكل</button>
-          </div>
-        </div>
-        <table id="finalResults" aria-live="polite">
-          <thead>
-            <tr>
-              <th>اسم المنتج</th>
-              <th>كود الميزان</th>
-              <th>العدد</th>
-              <th>QR Code</th>
-              <th>إجراء</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
+    <table id="results" aria-live="polite">
+      <thead>
+        <tr>
+          <th>اسم المنتج</th>
+          <th>كود الميزان</th>
+          <th>العدد/الوزن</th>
+          <th>QR Code</th>
+          <th>إجراء</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 
-  <div id="receiveModal" role="dialog" aria-modal="true">
-    <div id="receiveBox">
-      <div id="receiveTitle" style="font-weight:700; margin-bottom:8px;">استلام المنتج</div>
-      <input id="receiveInput" placeholder="ادخل العدد أو الوزن" inputmode="decimal" autocomplete="off">
-      <div class="numpad-recv" aria-hidden="false">
-        <button onclick="recvPress('1')">1</button>
-        <button onclick="recvPress('2')">2</button>
-        <button onclick="recvPress('3')">3</button>
-        <button onclick="recvPress('4')">4</button>
-        <button onclick="recvPress('5')">5</button>
-        <button onclick="recvPress('6')">6</button>
-        <button onclick="recvPress('7')">7</button>
-        <button onclick="recvPress('8')">8</button>
-        <button onclick="recvPress('9')">9</button>
-        <button onclick="recvBackspace()">⌫</button>
-        <button onclick="recvPress('0')">0</button>
-        <button onclick="recvDot()">.</button>
+  <!-- جدول المنتجات المختارة (شمال) -->
+  <div class="col" aria-label="المنتجات المختارة">
+    <h3>المنتجات المختارة</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <div>
+        <button id="clearAllBtn" onclick="clearAllSelected()">حذف الكل</button>
+      </div>
+      <div>
+        <button id="exportBtn" onclick="exportFinalToExcel()">تصدير إكسل</button>
+      </div>
+    </div>
+    <table id="finalResults" aria-live="polite">
+      <thead>
+        <tr>
+          <th>اسم المنتج</th>
+          <th>كود الميزان</th>
+          <th>العدد/الوزن</th>
+          <th>QR Code</th>
+          <th>إجراء</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+  </div>  <!-- مودال الاستلام -->  <div class="modal-overlay" id="receiveModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h4 id="modalTitle">استلام منتج</h4>
+      <div style="margin-bottom:8px; text-align:center; font-weight:600;" id="modalProductName"></div>
+      <input id="modalQty" class="modal-input" inputmode="decimal" placeholder="الكمية أو الوزن (مثال: 2 أو 0.5)">
+      <div class="numpad-modal" style="margin-top:12px;">
+        <button onclick="modalPress('7')">7</button>
+        <button onclick="modalPress('8')">8</button>
+        <button onclick="modalPress('9')">9</button>
+        <button onclick="modalPress('4')">4</button>
+        <button onclick="modalPress('5')">5</button>
+        <button onclick="modalPress('6')">6</button>
+        <button onclick="modalPress('1')">1</button>
+        <button onclick="modalPress('2')">2</button>
+        <button onclick="modalPress('3')">3</button>
+        <button onclick="modalBackspace()">⌫</button>
+        <button onclick="modalPress('0')">0</button>
+        <button onclick="modalPress('.')">.</button>
       </div>
       <div class="modal-actions">
-        <button class="btn ghost" onclick="closeReceiveModal()">إلغاء</button>
-        <button class="btn primary" onclick="confirmReceive()">تم</button>
+        <button class="smallBtn" onclick="closeModal()">إلغاء</button>
+        <button class="smallBtn" onclick="confirmModal()">تم</button>
       </div>
     </div>
-  </div>
-
-  <script>
-    let excelData = [];
-    let qrScanner = null;
-    let scanningMode = null;
+  </div>  <script>
+    /**************************************************************************
+     * متغيرات عامة
+     **************************************************************************/
+    let excelData = [];        // raw rows
+    let uniqueExcelData = [];  // filtered unique rows for display
+    let qrScanner = null;      // مثيل html5-qrcode
+    let scanningMode = null;   // 'qr' أو null
     let scaleFilterActive = false;
-    const correctPassword = "10100";
+    const correctPassword = "10100"; // عدل كلمة المرور لو تحتاج
 
+    /* عناصر DOM الرئيسية */
     const statusEl = document.getElementById('status');
     const loginBox = document.getElementById('loginBox');
     const passwordInput = document.getElementById('passwordInput');
@@ -343,44 +310,96 @@
     const finalTbody = document.querySelector('#finalResults tbody');
     const reader = document.getElementById('reader');
     const clearAllBtnEl = document.getElementById('clearAllBtn');
-    const clearResultsAllBtnEl = document.getElementById('clearResultsAllBtn');
+    const clearResultsBtnEl = document.getElementById('clearResultsBtn');
     const scaleBtnEl = document.getElementById('scaleBtn');
 
-    const receiveModal = document.getElementById('receiveModal');
-    const receiveInput = document.getElementById('receiveInput');
-    const receiveTitle = document.getElementById('receiveTitle');
+    const headers = ["اسم المنتج", "سعر المنتج", "كود الميزان", "QR Code"]; // for parsing assumption
 
-    let pendingReceive = null;
+    // maps for fast lookup
+    const finalMap = new Map(); // uniqueId -> {rowEl, qty}
 
+    /**************************************************************************
+     * تحميل ملف الإكسل (محاولات لعدة أسماء)
+     **************************************************************************/
     const excelCandidates = [
       "product.template(176).xlsx",
-      "product.template.xlsx",
       "products.xlsx",
-      "product.xlsx"
+      "product.xlsx",
+      "data.xlsx",
+      "products_template.xlsx"
     ];
 
-    async function tryLoadExcelList(list) {
-      for (const name of list) {
-        try {
-          const res = await fetch(name);
-          if (!res.ok) continue;
-          const data = await res.arrayBuffer();
-          const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
-          const firstSheet = workbook.SheetNames[0];
-          excelData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { header: 1 });
-          statusEl.textContent = "ملف فعال: " + name;
-          statusEl.className = "active";
-          return true;
-        } catch (e) {
-          console.warn("فشل قراءة:", name, e);
+    function tryLoadExcelList(list) {
+      let idx = 0;
+      function tryNext() {
+        if (idx >= list.length) {
+          statusEl.textContent = "فشل تحميل أي ملف إكسل";
+          statusEl.className = 'inactive';
+          return;
         }
+        const name = list[idx++];
+        fetch(name).then(res => {
+          if (!res.ok) throw new Error('not found');
+          return res.arrayBuffer();
+        }).then(data => {
+          try {
+            const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+            const firstSheet = workbook.SheetNames[0];
+            excelData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { header: 1 });
+            statusEl.textContent = "ملف فعال: " + name;
+            statusEl.className = 'active';
+            processExcelData();
+          } catch (err) {
+            console.error('خطأ قراءة الإكسل:', err);
+            tryNext();
+          }
+        }).catch(err => {
+          console.warn('لم يتم العثور على:', name);
+          tryNext();
+        });
       }
-      statusEl.textContent = "لا يوجد ملف فعال";
-      statusEl.className = "inactive";
-      return false;
+      tryNext();
     }
 
     tryLoadExcelList(excelCandidates);
+
+    /**************************************************************************
+     * معالجة بيانات الإكسل: إزالة التكرارات من العرض وتنبيه واحد لو في تكرارات
+     **************************************************************************/
+    function getUniqueIdFromRow(row) {
+      const qr = (row[3] || "").toString().trim();
+      const code = (row[2] || "").toString().trim();
+      if (qr) return 'QR::' + qr;
+      if (code) return 'CODE::' + code;
+      // fallback: use name
+      const name = (row[0] || "").toString().trim();
+      return 'NAME::' + name;
+    }
+
+    function processExcelData() {
+      uniqueExcelData = [];
+      const seen = new Map();
+      let duplicatesFound = false;
+      for (let i = 1; i < excelData.length; i++) {
+        const row = excelData[i] || [];
+        if (!row || row.length === 0) continue;
+        const uid = getUniqueIdFromRow(row);
+        if (seen.has(uid)) {
+          duplicatesFound = true;
+          continue; // skip adding duplicate for display
+        }
+        seen.set(uid, true);
+        uniqueExcelData.push(row);
+      }
+      if (duplicatesFound) {
+        alert('ملاحظة: توجد سجلات مكررة في ملف الإكسل. سيتم عرض نسخة واحدة فقط من كل منتج في نتائج البحث.');
+      }
+      statusEl.textContent = statusEl.className.includes('active') ? statusEl.textContent + ' (جاهز للبحث)' : statusEl.textContent;
+    }
+
+    /**************************************************************************
+     * --------------------  دوال الباسورد (مكانها هنا)  -----------------------
+     **************************************************************************/
 
     passwordInput.addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
@@ -390,39 +409,49 @@
         clearError();
       }
     });
-    passwordInput.addEventListener('input', function() { clearError(); });
+
+    passwordInput.addEventListener('input', function() {
+      clearError();
+    });
 
     function pressDigit(d) {
+      passwordInput.focus();
       passwordInput.value = (passwordInput.value || "") + d;
-      passwordInput.focus();
       clearError();
     }
+
     function backspacePass() {
-      passwordInput.value = (passwordInput.value || "").slice(0, -1);
       passwordInput.focus();
+      passwordInput.value = (passwordInput.value || "").slice(0, -1);
       clearError();
     }
+
     function submitPass() {
       if ((passwordInput.value || "") === correctPassword) {
         loginBox.style.display = "none";
         app.style.display = "block";
         clearError();
-        setTimeout(() => { try { searchBar.focus(); } catch(e){} }, 150);
+        setTimeout(() => { if (searchBar) searchBar.focus(); }, 150);
       } else {
         showError("كلمة المرور غير صحيحة");
       }
     }
+
     function showError(msg) {
       if (!passErrorBox) return;
       passErrorBox.textContent = msg;
       passErrorBox.style.display = "block";
     }
+
     function clearError() {
       if (!passErrorBox) return;
       passErrorBox.textContent = "";
       passErrorBox.style.display = "none";
     }
 
+    /**************************************************************************
+     * دعم الكيبورد العام على الصفحة (Enter للبحث داخل التطبيق، Delete لحذف آخر صف)
+     **************************************************************************/
     document.addEventListener('keydown', function(e) {
       if (app.style.display === 'block') {
         if (e.key === 'Enter') {
@@ -432,12 +461,16 @@
         } else if (e.key === 'Delete') {
           if (finalTbody && finalTbody.rows.length > 0) {
             finalTbody.deleteRow(finalTbody.rows.length - 1);
+            syncFinalMapFromDom();
             checkClearAllVisibility();
           }
         }
       }
     });
 
+    /**************************************************************************
+     * دوال البحث وإدارة الجداول
+     **************************************************************************/
     function search(fromScanner = false, scannerType = '', value = '') {
       const query = fromScanner ? (value + "").trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
       if (!query) {
@@ -447,51 +480,41 @@
         }
         return;
       }
-      if (!Array.isArray(excelData) || excelData.length === 0) return;
+      if (!Array.isArray(uniqueExcelData) || uniqueExcelData.length === 0) return;
 
       resultsTbody.innerHTML = "";
-      const seenResultsIds = new Set();
-      let warnedDuplicate = false;
 
-      excelData.forEach((row, idx) => {
-        if (idx === 0) return;
-        const name = (row[0] || "").toString();
-        const code = (row[2] || "").toString().toLowerCase();
-        const qr = (row[3] || "").toString().toLowerCase();
+      const shownUids = new Set();
+      uniqueExcelData.forEach((row) => {
+        const a = (row[0] || "").toString().toLowerCase(); // اسم
+        const b = (row[1] || "").toString();               // سعر (ignored)
+        const c = (row[2] || "").toString().toLowerCase(); // كود الميزان
+        const d = (row[3] || "").toString().toLowerCase(); // QR
 
-        if (name.toLowerCase().includes(query) || code.includes(query) || qr.includes(query)) {
-          const id = (qr && qr !== "") ? qr : (code && code !== "") ? code : name.toLowerCase();
-          if (seenResultsIds.has(id)) {
-            if (!warnedDuplicate) {
-              alert('تم العثور على نفس المنتج أكثر من مرة في المصدر. سيتم عرض نسخة واحدة فقط.');
-              warnedDuplicate = true;
-            }
-            return;
-          }
-          seenResultsIds.add(id);
+        const uid = getUniqueIdFromRow(row);
+        if (shownUids.has(uid)) return; // already shown
+
+        if (a.includes(query) || c.includes(query) || d.includes(query)) {
+          shownUids.add(uid);
 
           const tr = document.createElement('tr');
           const td0 = document.createElement('td'); td0.textContent = row[0] || ""; tr.appendChild(td0);
-          const td1 = document.createElement('td'); td1.textContent = row[2] || ""; tr.appendChild(td1);
-          const td2 = document.createElement('td'); td2.textContent = ""; tr.appendChild(td2);
+          const td1 = document.createElement('td'); td1.textContent = row[2] || ""; tr.appendChild(td1); // كود الميزان
+          const td2 = document.createElement('td'); td2.textContent = ""; tr.appendChild(td2); // العدد/الوزن فارغ افتراضي
           const td3 = document.createElement('td'); td3.textContent = row[3] || ""; tr.appendChild(td3);
 
           const tdAction = document.createElement('td');
-          const recvBtn = document.createElement('button');
-          recvBtn.className = 'addBtn';
-          recvBtn.textContent = 'استلام';
-          recvBtn.addEventListener('click', function() {
-            openReceiveModal({rowData: row, sourceTr: tr});
+          const receiveBtn = document.createElement('button');
+          receiveBtn.className = 'addBtn';
+          receiveBtn.textContent = 'استلام';
+          receiveBtn.addEventListener('click', function() {
+            openReceiveModal(row);
           });
-          tdAction.appendChild(recvBtn);
-
+          tdAction.appendChild(receiveBtn);
           const delBtn = document.createElement('button');
           delBtn.className = 'delBtn';
           delBtn.textContent = 'حذف';
-          delBtn.addEventListener('click', function() {
-            tr.remove();
-            checkClearResultsVisibility();
-          });
+          delBtn.addEventListener('click', function() { this.closest('tr').remove(); checkClearResultsVisibility(); });
           tdAction.appendChild(delBtn);
 
           tr.appendChild(tdAction);
@@ -503,10 +526,12 @@
         applyScaleFilterToTable(resultsTbody);
       }
 
+      // لو البحث جاء من الماسح (QR) نضمن التفريغ أيضاً لكن دون أي إضافة
       if (fromScanner) {
         searchBar.value = "";
         searchBar.dispatchEvent(new Event('input'));
       }
+
       checkClearResultsVisibility();
     }
 
@@ -516,100 +541,12 @@
       checkClearResultsVisibility();
     }
 
-    function addToFinalWithQty(row, qty) {
-      const qrVal = (row[3] || "").toString();
-      const codeVal = (row[2] || "").toString();
-
-      let existingRow = null;
-      for (let i = 0; i < finalTbody.rows.length; i++) {
-        const fr = finalTbody.rows[i];
-        const rQr = (fr.cells[3] && fr.cells[3].textContent) || "";
-        const rCode = (fr.cells[1] && fr.cells[1].textContent) || "";
-        if ((qrVal && rQr === qrVal && qrVal !== "") || (codeVal && rCode === codeVal && codeVal !== "")) {
-          existingRow = fr;
-          break;
-        }
-      }
-
-      if (existingRow) {
-        existingRow.cells[2].textContent = qty || "";
-        checkClearAllVisibility();
-        return true;
-      }
-
-      const tr = document.createElement('tr');
-      const td0 = document.createElement('td'); td0.textContent = row[0] || ""; tr.appendChild(td0);
-      const td1 = document.createElement('td'); td1.textContent = row[2] || ""; tr.appendChild(td1);
-      const td2 = document.createElement('td'); td2.textContent = qty || ""; tr.appendChild(td2);
-      const td3 = document.createElement('td'); td3.textContent = row[3] || ""; tr.appendChild(td3);
-
-      const tdDel = document.createElement('td');
-      const delBtn = document.createElement('button');
-      delBtn.className = 'delBtn';
-      delBtn.textContent = 'حذف';
-      delBtn.addEventListener('click', function() {
-        this.closest('tr').remove();
-        checkClearAllVisibility();
-      });
-      tdDel.appendChild(delBtn);
-      tr.appendChild(tdDel);
-
-      finalTbody.appendChild(tr);
-      checkClearAllVisibility();
-
-      if (scaleFilterActive) applyScaleFilterToTable(finalTbody);
-
-      return true;
-    }
-
-    function clearAllSelected() {
-      finalTbody.innerHTML = "";
-      checkClearAllVisibility();
-    }
-
-    function checkClearAllVisibility() {
-      if (!finalTbody || finalTbody.rows.length === 0) {
-        clearAllBtnEl.style.display = 'none';
-      } else {
-        clearAllBtnEl.style.display = 'inline-block';
-      }
-    }
-
-    function clearAllResults() {
+    function clearResults() {
       resultsTbody.innerHTML = "";
       checkClearResultsVisibility();
     }
 
     function checkClearResultsVisibility() {
       if (!resultsTbody || resultsTbody.rows.length === 0) {
-        clearResultsAllBtnEl.style.display = 'none';
-      } else {
-        clearResultsAllBtnEl.style.display = 'inline-block';
-      }
-    }
-
-    function toggleScaleFilter() {
-      scaleFilterActive = !scaleFilterActive;
-      scaleBtnEl.classList.toggle('scale-active', scaleFilterActive);
-      applyScaleFilterToTable(resultsTbody);
-      applyScaleFilterToTable(finalTbody);
-      checkClearAllVisibility();
-      checkClearResultsVisibility();
-    }
-
-    function applyScaleFilterToTable(tbody) {
-      if (!tbody) return;
-      const rows = Array.from(tbody.rows);
-      rows.forEach(row => {
-        const cell = row.cells[1];
-        const val = cell ? (cell.textContent || "").trim() : "";
-        row.style.display = (scaleFilterActive && val === "") ? 'none' : '';
-      });
-    }
-
-    function openReceiveModal({rowData, sourceTr}) {
-      pendingReceive = { rowData, sourceTr, updateExisting: null };
-      const codeVal = (rowData[2] || "").toString();
-      if (codeVal && codeVal.trim() !== "") {
-        receiveTitle.textContent = 'أدخل الوزن (كجم)';
-  
+        clearResultsBtnEl.style.display = 'none';
+     
