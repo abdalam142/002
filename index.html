@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>بحث المنتجات</title>
+  <meta name="viewport" content="width=1024" />
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -64,6 +65,11 @@
       font-size: 18px;
       cursor: pointer;
     }
+    video {
+      max-width: 100%;
+      border: 1px solid #ccc;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -72,7 +78,9 @@
   <input type="text" id="searchBar" placeholder="ابحث بالاسم أو الكود أو QR" style="width:300px; padding:5px;" />
   <button class="btn" onclick="searchProducts()">بحث</button>
   <button class="btn" onclick="toggleFilter()">فلتر كود الميزان</button>
+  <button class="btn" onclick="startCamera()">📷 الكاميرا</button>
   <div id="status"></div>
+  <video id="preview" autoplay></video>
 
   <div id="tables-container">
     <div class="table-box">
@@ -135,6 +143,8 @@
     </div>
   </div>
 
+  <!-- مكتبة QR -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <script>
     let products = [
       {name:"منتج 1", code:"111", qr:"A1"},
@@ -143,6 +153,7 @@
     ];
     let filterActive = false;
     let modalRow = null;
+    let html5QrCode;
 
     function searchProducts() {
       let q = document.getElementById("searchBar").value.trim();
@@ -231,6 +242,26 @@
       a.href=URL.createObjectURL(blob);
       a.download="selected.csv";
       a.click();
+    }
+
+    function startCamera(){
+      if(html5QrCode){
+        html5QrCode.stop().then(()=>{html5QrCode=null;});
+        return;
+      }
+      html5QrCode = new Html5Qrcode("preview");
+      Html5Qrcode.getCameras().then(devices=>{
+        if(devices && devices.length){
+          html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 250 },
+            qrCodeMessage => {
+              document.getElementById("searchBar").value = qrCodeMessage;
+            },
+            errorMessage => {}
+          );
+        }
+      }).catch(err=>alert("خطأ في الكاميرا: "+err));
     }
   </script>
 </body>
