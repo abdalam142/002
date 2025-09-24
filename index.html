@@ -125,15 +125,16 @@
     .btn.camera { background: var(--accent); color: #fff; }
     .btn.scale-active { background: #ffc107; color: #111; }
 
-    /* قارئ QR في أعلى اليمين */
+    /* قارئ QR - صغير وموجود في أقصى اليسار العلوي */
     #reader {
-      width: 280px;
+      width: 220px;
+      height: 150px;
       position: fixed;
-      top: 76px;
-      left: auto;
-      right: 18px; /* أعلى اليمين كما طلبت */
+      top: 18px;
+      left: 18px;
+      right: auto;
       display: none;
-      z-index: 80;
+      z-index: 9999;
       background: #fff;
       border-radius: 8px;
       padding: 6px;
@@ -235,7 +236,7 @@
     @media (max-width: 900px) {
       .tables { flex-direction: column; }
       .col { width: 100%; }
-      #reader { width: 100%; right: 12px; left: 12px; top: auto; bottom: 12px; }
+      #reader { width: calc(100% - 24px); left: 12px; right: 12px; top: 12px; height: 220px; }
       #searchBar { width: 85%; }
     }
 
@@ -297,7 +298,7 @@
       <button id="moveAllBtn" class="btn" style="background:#0b5ed7;color:#fff;" onclick="moveAllToCompleted()">نقل كل المنتجات</button>
     </div>
 
-    <!-- قارئ QR يظهر هنا أعلى اليمين -->
+    <!-- قارئ QR يظهر هنا أعلى اليسار -->
     <div id="reader" aria-hidden="true"></div>
 
     <div class="tables">
@@ -487,7 +488,7 @@
      * دوال البحث وإظهار نتائج (اليمين) — حذف عمود السعر من العرض
      **************************************************************************/
     function search(fromScanner = false, value = '') {
-      const query = fromScanner ? (String(value || "")).trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
+      const query =toLowerCase();
       if (!query) {
         if (fromScanner) {
           searchBar.value = "";
@@ -506,35 +507,10 @@
         const scaleCode = (row[2] || "").toString();
         const qr = (row[3] || "").toString();
 
-        const a = name.toLowerCase();
-        const c = scaleCode.toLowerCase();
-        const d = qr.toLowerCase();
-
-        if (a.includes(query) || c.includes(query) || d.includes(query)) {
-          // تأكد عدم وجود مكرر في الجدول اليمين (منع التكرار)
-          const exists = Array.from(resultsTbody.rows).some(r => {
-            const rQr = (r.cells[2] && r.cells[2].textContent) || "";
-            const rCode = (r.cells[1] && r.cells[1].textContent) || "";
-            return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
-          });
-          if (exists) {
-            // نعرض صف مختصر ينبه للمكرر
-            const tr = document.createElement('tr');
-            const td0 = document.createElement('td'); td0.textContent = name; tr.appendChild(td0);
-            const td1 = document.createElement('td'); td1.textContent = scaleCode; tr.appendChild(td1);
-            const td2 = document.createElement('td'); td2.textContent = qr; tr.appendChild(td2);
+        const a = name.toLowerCase عدمع =some(r => {
+           Qr =           2('td'); td2.textContent = qr; tr.appendChild(td2);
             const td3 = document.createElement('td'); td3.textContent = ''; tr.appendChild(td3);
-            const td4 = document.createElement('td'); td4.textContent = 'مكرر'; tr.appendChild(td4);
-            resultsTbody.appendChild(tr);
-            return;
-          }
-
-          const tr = document.createElement('tr');
-          const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
-          const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
-          const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
-
-          const tdQty = document.createElement('td');
+            const td4 = document.createElement('td'); tdQty = document.createElement('td');
           tdQty.textContent = ''; // سيُستكمل عبر النافذة
           tr.appendChild(tdQty);
 
@@ -779,14 +755,12 @@
       checkClearAllVisibility();
     }
 
-    function checkClearAllVisibility() {
-      if (!finalTbody || finalTbody.rows.length === 0) {
+    function checkClearfinalTbody || finalTbody.rows.length === 0) {
         document.getElementById('clearAllBtn').style.display = 'none';
       } else {
         document.getElementById('clearAllBtn').style.display = 'inline-block';
       }
-      // زر حذف الكل في الأعلى جدول المكتمل
-      if (!finalTbody || finalTbody.rows.length === 0) {
+      // زر حذف الكل في الأعلى جدول المكتمل) {
         document.getElementById('deleteAllCompleted').style.display = 'none';
       } else {
         document.getElementById('deleteAllCompleted').style.display = '';
@@ -794,10 +768,7 @@
     }
 
     /**************************************************************************
-     * قارئ QR — يبقى يعمل حتى نغلقه يدوياً؛ عند كل مسح يضيف سجل إلى اليمين
-     **************************************************************************/
-    function toggleScanner() {
-      if (scanningMode === 'qr') {
+     * قارئ QR — يبقى يعمل حتى نغلقه يدوياً؛ عندanningMode === 'qr') {
         stopScanner();
         return;
       }
@@ -807,23 +778,8 @@
     function startScanner() {
       scanningMode = 'qr';
       reader.style.display = 'block';
-      cameraBtn.textContent = '✖ إيقاف الكاميرا';
-      const scanner = new Html5Qrcode("reader");
-      const config = { fps: 8, qrbox: 200 };
-      scanner.start(
-        { facingMode: "environment" },
-        config,
-        (decodedText, decodedResult) => {
-          handleDecodedFromScanner(String(decodedText || ""));
-        },
-        (errorMessage) => {
-          // ignore decode errors
-        }
-      ).then(() => {
-        qrScanner = scanner;
-      }).catch(err => {
-        alert("فشل تشغيل الكاميرا: " + err);
-        reader.style.display = 'none';
+      cameraBtn.textContent = '✖ إيقاف الكاميرا,  (
+ = 'none';
         scanningMode = null;
         cameraBtn.textContent = '📷 كاميرا';
       });
@@ -831,20 +787,8 @@
 
     function handleDecodedFromScanner(decodedText) {
       if (!decodedText) return;
-      const now = Date.now();
-      if (decodedText === lastScan.text && (now - lastScan.time) < 1000) {
-        lastScan.time = now;
-        return;
-      }
-      lastScan.text = decodedText;
-      lastScan.time = now;
-
-      // نبحث في الاكسل عن هذا الكود ونضيف صف إلى اليمين (إذا لم يكن مكرر)
-      if (!Array.isArray(excelData) || excelData.length === 0) return;
-      const query = decodedText.trim().toLowerCase();
-
-      let found = false;
-      excelData.forEach((row, idx) => {
+      const now =;
+ لمArray Lower excelEach((row, idx) => {
         if (idx === 0) return;
         const name = (row[0] || "").toString();
         const scaleCode = (row[2] || "").toString();
