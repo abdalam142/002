@@ -239,25 +239,6 @@
       #reader { width: calc(100% - 24px); left: 12px; right: 12px; top: 12px; height: 220px; }
       #searchBar { width: 85%; }
     }
-
-    /* Copy code modal styles */
-    #copyCodeBtn {
-      position: fixed;
-      bottom: 18px;
-      left: 18px;
-      z-index: 400;
-      background:#0d6efd;color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer;
-    }
-    #codeModalOverlay {
-      display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:450; align-items:center; justify-content:center;
-    }
-    #codeModal {
-      width: min(960px, 96%); max-height: 86%; overflow:auto;
-      background:#fff; border-radius:8px; padding:12px; box-shadow:0 6px 30px rgba(0,0,0,0.25); direction:ltr;
-    }
-    #codeArea { width:100%; height:420px; font-family: monospace; font-size:12px; white-space:pre; overflow:auto; }
-    .modal-actions { margin-top:8px; text-align:right; }
-    .modal-actions button { margin-left:8px; padding:8px 12px; border-radius:6px; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -367,24 +348,6 @@
   <!-- نافذة صغيرة لعرض القيمة القديمة عند التعديل (ستظهر بجانب الخانة) -->
   <div id="oldValuePopup" style="position:fixed; display:none; z-index:220; background:#333; color:#fff; padding:6px 8px; border-radius:6px; font-size:13px;"></div>
 
-  <!-- زر ونافذة لعرض ونسخ كود الملف -->
-  <button id="copyCodeBtn" title="عرض ونسخ كود الصفحة">نسخ الكود</button>
-
-  <div id="codeModalOverlay" role="dialog" aria-modal="true">
-    <div id="codeModal">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <strong>كود الصفحة (index.html)</strong>
-        <button onclick="closeCodeModal()" style="background:#dc3545;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;">إغلاق</button>
-      </div>
-      <textarea id="codeArea" readonly></textarea>
-      <div class="modal-actions">
-        <button id="copyToClipboardBtn" style="background:#0d6efd;color:#fff;border:none;">نسخ للحافظة</button>
-        <button id="downloadCodeBtn" style="background:#198754;color:#fff;border:none;">تحميل كملف</button>
-      </div>
-      <div style="font-size:12px;margin-top:8px;color:#666;">انسخ النص ثم ألصقه هنا في الشات لإرساله.</div>
-    </div>
-  </div>
-
   <script>
     /**************************************************************************
      * متغيرات عامة
@@ -488,7 +451,7 @@
      * دوال البحث وإظهار نتائج (اليمين) — حذف عمود السعر من العرض
      **************************************************************************/
     function search(fromScanner = false, value = '') {
-      const query =toLowerCase();
+      const query = fromScanner ? (String(value || "")).trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
       if (!query) {
         if (fromScanner) {
           searchBar.value = "";
@@ -507,10 +470,35 @@
         const scaleCode = (row[2] || "").toString();
         const qr = (row[3] || "").toString();
 
-        const a = name.toLowerCase عدمع =some(r => {
-           Qr =           2('td'); td2.textContent = qr; tr.appendChild(td2);
+        const a = name.toLowerCase();
+        const c = scaleCode.toLowerCase();
+        const d = qr.toLowerCase();
+
+        if (a.includes(query) || c.includes(query) || d.includes(query)) {
+          // تأكد عدم وجود مكرر في الجدول اليمين (منع التكرار)
+          const exists = Array.from(resultsTbody.rows).some(r => {
+            const rQr = (r.cells[2] && r.cells[2].textContent) || "";
+            const rCode = (r.cells[1] && r.cells[1].textContent) || "";
+            return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
+          });
+          if (exists) {
+            // نعرض صف مختصر ينبه للمكرر
+            const tr = document.createElement('tr');
+            const td0 = document.createElement('td'); td0.textContent = name; tr.appendChild(td0);
+            const td1 = document.createElement('td'); td1.textContent = scaleCode; tr.appendChild(td1);
+            const td2 = document.createElement('td'); td2.textContent = qr; tr.appendChild(td2);
             const td3 = document.createElement('td'); td3.textContent = ''; tr.appendChild(td3);
-            const td4 = document.createElement('td'); tdQty = document.createElement('td');
+            const td4 = document.createElement('td'); td4.textContent = 'مكرر'; tr.appendChild(td4);
+            resultsTbody.appendChild(tr);
+            return;
+          }
+
+          const tr = document.createElement('tr');
+          const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
+          const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
+          const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
+
+          const tdQty = document.createElement('td');
           tdQty.textContent = ''; // سيُستكمل عبر النافذة
           tr.appendChild(tdQty);
 
@@ -755,12 +743,14 @@
       checkClearAllVisibility();
     }
 
-    function checkClearfinalTbody || finalTbody.rows.length === 0) {
+    function checkClearAllVisibility() {
+      if (!finalTbody || finalTbody.rows.length === 0) {
         document.getElementById('clearAllBtn').style.display = 'none';
       } else {
         document.getElementById('clearAllBtn').style.display = 'inline-block';
       }
-      // زر حذف الكل في الأعلى جدول المكتمل) {
+      // زر حذف الكل في الأعلى جدول المكتمل
+      if (!finalTbody || finalTbody.rows.length === 0) {
         document.getElementById('deleteAllCompleted').style.display = 'none';
       } else {
         document.getElementById('deleteAllCompleted').style.display = '';
@@ -768,7 +758,10 @@
     }
 
     /**************************************************************************
-     * قارئ QR — يبقى يعمل حتى نغلقه يدوياً؛ عندanningMode === 'qr') {
+     * قارئ QR — يبقى يعمل حتى نغلقه يدوياً؛ عند كل مسح يضيف سجل إلى اليمين
+     **************************************************************************/
+    function toggleScanner() {
+      if (scanningMode === 'qr') {
         stopScanner();
         return;
       }
@@ -778,8 +771,23 @@
     function startScanner() {
       scanningMode = 'qr';
       reader.style.display = 'block';
-      cameraBtn.textContent = '✖ إيقاف الكاميرا,  (
- = 'none';
+      cameraBtn.textContent = '✖ إيقاف الكاميرا';
+      const scanner = new Html5Qrcode("reader");
+      const config = { fps: 8, qrbox: { width: 200, height: 120 } };
+      scanner.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText, decodedResult) => {
+          handleDecodedFromScanner(String(decodedText || ""));
+        },
+        (errorMessage) => {
+          // ignore decode errors
+        }
+      ).then(() => {
+        qrScanner = scanner;
+      }).catch(err => {
+        alert("فشل تشغيل الكاميرا: " + err);
+        reader.style.display = 'none';
         scanningMode = null;
         cameraBtn.textContent = '📷 كاميرا';
       });
@@ -787,8 +795,20 @@
 
     function handleDecodedFromScanner(decodedText) {
       if (!decodedText) return;
-      const now =;
- لمArray Lower excelEach((row, idx) => {
+      const now = Date.now();
+      if (decodedText === lastScan.text && (now - lastScan.time) < 1000) {
+        lastScan.time = now;
+        return;
+      }
+      lastScan.text = decodedText;
+      lastScan.time = now;
+
+      // نبحث في الاكسل عن هذا الكود ونضيف صف إلى اليمين (إذا لم يكن مكرر)
+      if (!Array.isArray(excelData) || excelData.length === 0) return;
+      const query = decodedText.trim().toLowerCase();
+
+      let found = false;
+      excelData.forEach((row, idx) => {
         if (idx === 0) return;
         const name = (row[0] || "").toString();
         const scaleCode = (row[2] || "").toString();
@@ -952,67 +972,7 @@
       }
     });
 
-    /**************************************************************************
-     * Copy modal logic
-     **************************************************************************/
-    const copyCodeBtn = document.getElementById('copyCodeBtn');
-    const codeModalOverlay = document.getElementById('codeModalOverlay');
-    const codeArea = document.getElementById('codeArea');
-    const copyToClipboardBtn = document.getElementById('copyToClipboardBtn');
-    const downloadCodeBtn = document.getElementById('downloadCodeBtn');
-
-    async function fetchSource() {
-      try {
-        const rawUrl = 'https://raw.githubusercontent.com/abdalam142/002/main/index.html';
-        const res = await fetch(rawUrl);
-        if (res.ok) {
-          return await res.text();
-        }
-      } catch(e) {
-        // fallback
-      }
-      return '<!-- نسخة من DOM الحالي -->\n' + document.documentElement.outerHTML;
-    }
-
-    async function openCodeModal() {
-      codeArea.value = '...جارٍ التحميل';
-      codeModalOverlay.style.display = 'flex';
-      const src = await fetchSource();
-      codeArea.value = src;
-      codeArea.select();
-    }
-
-    function closeCodeModal() {
-      codeModalOverlay.style.display = 'none';
-    }
-
-    copyCodeBtn.addEventListener('click', openCodeModal);
-    copyToClipboardBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(codeArea.value);
-        copyToClipboardBtn.textContent = 'تم النسخ ✓';
-        setTimeout(() => copyToClipboardBtn.textContent = 'نسخ للحافظة', 1400);
-      } catch(e) {
-        alert('فشل النسخ. يمكنك تحديد النص ونسخه يدوياً.');
-      }
-    });
-
-    downloadCodeBtn.addEventListener('click', () => {
-      const blob = new Blob([codeArea.value], {type:'text/html;charset=utf-8'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'index.html';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    });
-
-    codeModalOverlay.addEventListener('click', (ev) => {
-      if (ev.target === codeModalOverlay) closeCodeModal();
-    });
-
+    codeModalOverlay && codeModalOverlay.remove?.();
   </script>
 </body>
 </html>
