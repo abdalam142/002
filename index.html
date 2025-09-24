@@ -1,102 +1,1074 @@
-<!-- زر ونافذة لعرض ونسخ كود الملف -->
-<style>
-  #copyCodeBtn {
-    position: fixed;
-    bottom: 18px;
-    left: 18px;
-    z-index: 400;
-    background:#0d6efd;color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer;
-  }
-  #codeModalOverlay {
-    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:450; align-items:center; justify-content:center;
-  }
-  #codeModal {
-    width: min(960px, 96%); max-height: 86%; overflow:auto;
-    background:#fff; border-radius:8px; padding:12px; box-shadow:0 6px 30px rgba(0,0,0,0.25); direction:ltr;
-  }
-  #codeArea { width:100%; height:420px; font-family: monospace; font-size:12px; white-space:pre; overflow:auto; }
-  .modal-actions { margin-top:8px; text-align:right; }
-  .modal-actions button { margin-left:8px; padding:8px 12px; border-radius:6px; cursor:pointer; }
-</style>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>استلام منتجات</title>
 
-<button id="copyCodeBtn" title="عرض ونسخ كود الصفحة">نسخ الكود</button>
+  <!-- مكتبات -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>
 
-<div id="codeModalOverlay" role="dialog" aria-modal="true">
-  <div id="codeModal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <strong>كود الصفحة (index.html)</strong>
-      <button onclick="closeCodeModal()" style="background:#dc3545;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;">إغلاق</button>
+  <style>
+    :root {
+      --card-bg: #ffffff;
+      --muted: #6c757d;
+      --primary: #0d6efd;
+      --success: #28a745;
+      --danger: #dc3545;
+      --accent: #20c997;
+      --warning: #ffc107;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f7fb;
+      color: #222;
+      margin: 0;
+      padding: 18px;
+      box-sizing: border-box;
+      direction: rtl;
+    }
+    h2 { text-align: center; margin: 6px 0 12px; }
+
+    /* مؤشر حالة ملف الإكسل */
+    #status {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: #fff;
+      font-weight: 700;
+      z-index: 60;
+    }
+    #status.active { background: var(--success); }
+    #status.inactive { background: var(--danger); }
+
+    /* شاشة الباسورد */
+    #loginBox {
+      background: var(--card-bg);
+      padding: 14px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      max-width: 420px;
+      margin: 10px auto;
+      text-align: center;
+    }
+    #passwordInput {
+      width: 100%;
+      max-width: 260px;
+      padding: 10px;
+      font-size: 20px;
+      text-align: center;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .numpad {
+      width: 260px;
+      margin: 12px auto 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .numpad button {
+      padding: 12px;
+      font-size: 18px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #f3f3f3;
+      cursor: pointer;
+    }
+    #passError {
+      display: none;
+      margin-top: 10px;
+      color: #842029;
+      background: #f8d7da;
+      border: 1px solid #f5c2c7;
+      padding: 8px 10px;
+      border-radius: 6px;
+      width: 90%;
+      max-width: 320px;
+      margin-inline: auto;
+      box-sizing: border-box;
+    }
+
+    /* التطبيق */
+    #app {
+      display: none;
+      margin-top: 14px;
+    }
+    .searchRow {
+      text-align: center;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    #searchBar {
+      width: 60%;
+      max-width: 520px;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+      display: inline-block;
+    }
+    .btn {
+      padding: 10px 14px;
+      margin: 0 6px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .btn.primary { background: var(--primary); color: #fff; }
+    .btn.ghost { background: #e9ecef; }
+    .btn.camera { background: var(--accent); color: #fff; }
+    .btn.scale-active { background: #ffc107; color: #111; }
+
+    /* قارئ QR في أعلى اليمين */
+    #reader {
+      width: 280px;
+      position: fixed;
+      top: 76px;
+      left: auto;
+      right: 18px; /* أعلى اليمين كما طلبت */
+      display: none;
+      z-index: 80;
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    }
+
+    .tables {
+      display: flex;
+      gap: 18px;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .col {
+      width: 48%;
+      background: var(--card-bg);
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+      box-sizing: border-box;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      word-wrap: break-word;
+    }
+    thead th {
+      background: #f2f2f2;
+      padding: 8px;
+      border: 1px solid #ddd;
+      font-weight: 600;
+    }
+    tbody td {
+      padding: 8px;
+      border: 1px solid #ddd;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    /* أعمدة بعرض ثابت (نسب) */
+    table th:nth-child(1), table td:nth-child(1) { width: 40%; } /* اسم المنتج */
+    table th:nth-child(2), table td:nth-child(2) { width: 18%; } /* كود الميزان */
+    table th:nth-child(3), table td:nth-child(3) { width: 18%; } /* QR */
+    table th:nth-child(4), table td:nth-child(4) { width: 12%; } /* كمية */
+    table th:nth-child(5), table td:nth-child(5) { width: 12%; } /* إجراء */
+
+    .addBtn { background: #198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    .delBtn { background: var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    .moveBtn { background: var(--primary); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    #clearAllBtn { background: var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
+
+    /* صف بدون قيمة - معلم بالأحمر */
+    .no-value { background: #ffe5e5 !important; }
+
+    /* نافذة لوحة الأرقام المنبثقة */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal {
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px;
+      width: 320px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    .modal h4 { margin: 6px 0 10px; }
+    .num-input {
+      width: 100%;
+      padding: 10px;
+      font-size: 20px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .modal .numpad { width: 100%; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; }
+    .small-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+    /* صغير لإظهار القيمة القديمة بجانب القيمة الجديدة */
+    .old-value-badge {
+      font-size: 12px;
+      color: #fff;
+      background: #6c757d;
+      padding: 2px 6px;
+      border-radius: 6px;
+      margin-right: 6px;
+    }
+
+    @media (max-width: 900px) {
+      .tables { flex-direction: column; }
+      .col { width: 100%; }
+      #reader { width: 100%; right: 12px; left: 12px; top: auto; bottom: 12px; }
+      #searchBar { width: 85%; }
+    }
+
+    /* Copy code modal styles */
+    #copyCodeBtn {
+      position: fixed;
+      bottom: 18px;
+      left: 18px;
+      z-index: 400;
+      background:#0d6efd;color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer;
+    }
+    #codeModalOverlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:450; align-items:center; justify-content:center;
+    }
+    #codeModal {
+      width: min(960px, 96%); max-height: 86%; overflow:auto;
+      background:#fff; border-radius:8px; padding:12px; box-shadow:0 6px 30px rgba(0,0,0,0.25); direction:ltr;
+    }
+    #codeArea { width:100%; height:420px; font-family: monospace; font-size:12px; white-space:pre; overflow:auto; }
+    .modal-actions { margin-top:8px; text-align:right; }
+    .modal-actions button { margin-left:8px; padding:8px 12px; border-radius:6px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <h2>استلام منتجات</h2>
+
+  <!-- مؤشر حالة ملف الإكسل -->
+  <div id="status" class="inactive">لا يوجد ملف فعال</div>
+
+  <!-- شاشة الباسورد -->
+  <div id="loginBox" aria-live="polite">
+    <input id="passwordInput" type="password" placeholder="ادخل كلمة المرور" aria-label="كلمة المرور">
+    <div class="numpad" style="margin-top:12px;">
+      <button onclick="pressDigit('1')">1</button>
+      <button onclick="pressDigit('2')">2</button>
+      <button onclick="pressDigit('3')">3</button>
+      <button onclick="pressDigit('4')">4</button>
+      <button onclick="pressDigit('5')">5</button>
+      <button onclick="pressDigit('6')">6</button>
+      <button onclick="pressDigit('7')">7</button>
+      <button onclick="pressDigit('8')">8</button>
+      <button onclick="pressDigit('9')">9</button>
+      <button onclick="backspacePass()">⌫</button>
+      <button onclick="pressDigit('0')">0</button>
+      <button onclick="submitPass()">⏎</button>
     </div>
-    <textarea id="codeArea" readonly></textarea>
-    <div class="modal-actions">
-      <button id="copyToClipboardBtn" style="background:#0d6efd;color:#fff;border:none;">نسخ للحافظة</button>
-      <button id="downloadCodeBtn" style="background:#198754;color:#fff;border:none;">تحميل كملف</button>
-    </div>
-    <div style="font-size:12px;margin-top:8px;color:#666;">انسخ النص ثم ألصقه هنا في الشات لإرساله.</div>
+
+    <!-- رسالة الخطأ داخل الصفحة -->
+    <div id="passError" role="alert" aria-live="assertive"></div>
   </div>
-</div>
 
-<script>
-  const copyCodeBtn = document.getElementById('copyCodeBtn');
-  const codeModalOverlay = document.getElementById('codeModalOverlay');
-  const codeArea = document.getElementById('codeArea');
-  const copyToClipboardBtn = document.getElementById('copyToClipboardBtn');
-  const downloadCodeBtn = document.getElementById('downloadCodeBtn');
+  <!-- التطبيق -->
+  <div id="app">
+    <div class="searchRow" role="region" aria-label="شريط البحث">
+      <input id="searchBar" type="text" placeholder="اكتب الاسم أو الباركود أو وصف المنتج" aria-label="بحث">
+      <button id="searchBtn" class="btn primary" onclick="search(false)">بحث</button>
+      <button id="clearBtn" class="btn ghost" onclick="clearSearch()">حذف</button>
+      <button id="cameraBtn" class="btn camera" onclick="toggleScanner()">📷 كاميرا</button>
+      <button id="moveAllBtn" class="btn" style="background:#0b5ed7;color:#fff;" onclick="moveAllToCompleted()">نقل كل المنتجات</button>
+    </div>
 
-  // محاولة جلب النص الأصلي من raw.githubusercontent، وإلا نستخدم DOM الحالي
-  async function fetchSource() {
-    try {
-      // غيّر owner/repo/branch/path لو كان مختلف
-      const rawUrl = 'https://raw.githubusercontent.com/abdalam142/002/main/index.html';
-      const res = await fetch(rawUrl);
-      if (res.ok) {
-        return await res.text();
+    <!-- قارئ QR يظهر هنا أعلى اليمين -->
+    <div id="reader" aria-hidden="true"></div>
+
+    <div class="tables">
+      <!-- جدول اليمين: سجل الاستلام (التسجيل الأولي) -->
+      <div class="col" aria-label="سجل الاستلام">
+        <h3>سجل الاستلام (تسجيل)</h3>
+        <div style="text-align:left; margin-bottom:6px;">
+          <button id="clearAllBtn" onclick="clearAllCompleted()" style="display:none;">حذف الكل</button>
+        </div>
+        <table id="results" aria-live="polite">
+          <thead>
+            <tr>
+              <th>اسم المنتج</th>
+              <th>كود الميزان</th>
+              <th>QR Code</th>
+              <th>الكمية (كجم)</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- جدول اليسار: المكتمل -->
+      <div class="col" aria-label="المكتمل">
+        <h3>المنتجات المكتملة</h3>
+        <div style="text-align:left; margin-bottom:6px;">
+          <button id="exportBtn" class="btn primary" onclick="exportCompleted()">حفظ/تصدير (Excel)</button>
+          <button id="deleteAllCompleted" class="btn ghost" onclick="clearCompleted()">حذف الكل</button>
+        </div>
+        <table id="finalResults" aria-live="polite">
+          <thead>
+            <tr>
+              <th>اسم المنتج</th>
+              <th>كود الميزان</th>
+              <th>QR Code</th>
+              <th>الكمية (كجم)</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- نافذة رقمية منبثقة لإدخال الكمية/الوزن -->
+  <div id="modalOverlay" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal" role="document">
+      <h4 id="modalTitle">ادخل الكمية / الوزن (كجم)</h4>
+      <input id="modalInput" class="num-input" type="text" inputmode="decimal" placeholder="مثال: 1.25" />
+      <div class="numpad" id="modalNumpad">
+        <button onclick="modalDigit('1')">1</button><button onclick="modalDigit('2')">2</button><button onclick="modalDigit('3')">3</button>
+        <button onclick="modalDigit('4')">4</button><button onclick="modalDigit('5')">5</button><button onclick="modalDigit('6')">6</button>
+        <button onclick="modalDigit('7')">7</button><button onclick="modalDigit('8')">8</button><button onclick="modalDigit('9')">9</button>
+        <button onclick="modalBack()">⌫</button><button onclick="modalDigit('0')">0</button><button onclick="modalDot()">.</button>
+      </div>
+      <div style="margin-top:10px;">
+        <button class="btn primary" onclick="confirmModal()">تم</button>
+        <button class="btn ghost" onclick="cancelModal()">إلغاء</button>
+      </div>
+      <div class="small-note">القيمة تُخزّن وتعرض دائماً بالكيلو جرام (كجم)</div>
+    </div>
+  </div>
+
+  <!-- نافذة صغيرة لعرض القيمة القديمة عند التعديل (ستظهر بجانب الخانة) -->
+  <div id="oldValuePopup" style="position:fixed; display:none; z-index:220; background:#333; color:#fff; padding:6px 8px; border-radius:6px; font-size:13px;"></div>
+
+  <!-- زر ونافذة لعرض ونسخ كود الملف -->
+  <button id="copyCodeBtn" title="عرض ونسخ كود الصفحة">نسخ الكود</button>
+
+  <div id="codeModalOverlay" role="dialog" aria-modal="true">
+    <div id="codeModal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <strong>كود الصفحة (index.html)</strong>
+        <button onclick="closeCodeModal()" style="background:#dc3545;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;">إغلاق</button>
+      </div>
+      <textarea id="codeArea" readonly></textarea>
+      <div class="modal-actions">
+        <button id="copyToClipboardBtn" style="background:#0d6efd;color:#fff;border:none;">نسخ للحافظة</button>
+        <button id="downloadCodeBtn" style="background:#198754;color:#fff;border:none;">تحميل كملف</button>
+      </div>
+      <div style="font-size:12px;margin-top:8px;color:#666;">انسخ النص ثم ألصقه هنا في الشات لإرساله.</div>
+    </div>
+  </div>
+
+  <script>
+    /**************************************************************************
+     * متغيرات عامة
+     **************************************************************************/
+    let excelData = [];        // بيانات الإكسل كـ array of arrays
+    let qrScanner = null;      // مثيل html5-qrcode
+    let scanningMode = null;   // 'qr' أو null
+    let lastScan = { text: null, time: 0 };
+    const correctPassword = "10100"; // كلمة المرور كما كانت
+
+    /* عناصر DOM */
+    const statusEl = document.getElementById('status');
+    const loginBox = document.getElementById('loginBox');
+    const passwordInput = document.getElementById('passwordInput');
+    const passErrorBox = document.getElementById('passError');
+    const app = document.getElementById('app');
+
+    const searchBar = document.getElementById('searchBar');
+    const resultsTbody = document.querySelector('#results tbody');
+    const finalTbody = document.querySelector('#finalResults tbody');
+    const reader = document.getElementById('reader');
+    const cameraBtn = document.getElementById('cameraBtn');
+
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalInput = document.getElementById('modalInput');
+    const oldValuePopup = document.getElementById('oldValuePopup');
+
+    // خريطة لتتبع الصف الحالي الذي نطلب له القيمة من النافذة
+    let pendingRowForValue = null; // {rowEl, rowIndex, sourceRowData}
+
+    // اسم ملف الإكسل المصدر (يقرا عند البداية)
+    const sourceXlsxName = "product.template(176).xlsx";
+
+    /**************************************************************************
+     * قراءة ملف الإكسل عند التحميل (كما كان)
+     **************************************************************************/
+    fetch(sourceXlsxName)
+      .then(res => res.arrayBuffer())
+      .then(data => {
+        try {
+          const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+          const firstSheet = workbook.SheetNames[0];
+          excelData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { header: 1 });
+          statusEl.textContent = "ملف فعال";
+          statusEl.className = "active";
+        } catch (err) {
+          console.error("خطأ قراءة الإكسل:", err);
+          statusEl.textContent = "ملف غير صالح";
+          statusEl.className = "inactive";
+        }
+      })
+      .catch(err => {
+        console.warn("لم يتم العثور على ملف الإكسل:", err);
+        statusEl.textContent = "لا يوجد ملف فعال";
+        statusEl.className = "inactive";
+      });
+
+    /**************************************************************************
+     * دوال الباسورد والكيبود الأصلي
+     **************************************************************************/
+    passwordInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitPass();
+      } else {
+        clearError();
       }
-    } catch(e) {
-      // تجاهل الخطأ واستعمل DOM
+    });
+    passwordInput.addEventListener('input', function() { clearError(); });
+
+    function pressDigit(d) {
+      passwordInput.value = (passwordInput.value || "") + d;
+      clearError();
     }
-    // احتياطي: نسخة من DOM الحالية (قد تختلف عن الملف الأصلي)
-    return '<!-- نسخة من DOM الحالي -->\n' + document.documentElement.outerHTML;
-  }
-
-  async function openCodeModal() {
-    codeArea.value = '...جارٍ التحميل';
-    codeModalOverlay.style.display = 'flex';
-    const src = await fetchSource();
-    codeArea.value = src;
-    // اجعل النص محدد لتسهيل النسخ
-    codeArea.select();
-  }
-
-  function closeCodeModal() {
-    codeModalOverlay.style.display = 'none';
-  }
-
-  copyCodeBtn.addEventListener('click', openCodeModal);
-  copyToClipboardBtn.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(codeArea.value);
-      copyToClipboardBtn.textContent = 'تم النسخ ✓';
-      setTimeout(() => copyToClipboardBtn.textContent = 'نسخ للحافظة', 1400);
-    } catch(e) {
-      alert('فشل النسخ. يمكنك تحديد النص ونسخه يدوياً.');
+    function backspacePass() {
+      passwordInput.value = (passwordInput.value || "").slice(0, -1);
+      clearError();
     }
-  });
+    function submitPass() {
+      if ((passwordInput.value || "") === correctPassword) {
+        loginBox.style.display = "none";
+        app.style.display = "block";
+        clearError();
+        setTimeout(() => { if (searchBar) searchBar.focus(); }, 150);
+      } else {
+        showError("كلمة المرور غير صحيحة");
+      }
+    }
+    function showError(msg) {
+      if (!passErrorBox) return;
+      passErrorBox.textContent = msg;
+      passErrorBox.style.display = "block";
+    }
+    function clearError() {
+      if (!passErrorBox) return;
+      passErrorBox.textContent = "";
+      passErrorBox.style.display = "none";
+    }
 
-  downloadCodeBtn.addEventListener('click', () => {
-    const blob = new Blob([codeArea.value], {type:'text/html;charset=utf-8'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'index.html';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  });
+    /**************************************************************************
+     * دوال البحث وإظهار نتائج (اليمين) — حذف عمود السعر من العرض
+     **************************************************************************/
+    function search(fromScanner = false, value = '') {
+      const query = fromScanner ? (String(value || "")).trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
+      if (!query) {
+        if (fromScanner) {
+          searchBar.value = "";
+          searchBar.dispatchEvent(new Event('input'));
+        }
+        return;
+      }
+      if (!Array.isArray(excelData) || excelData.length === 0) return;
 
-  // إغلاق بالنقر خارج النافذة
-  codeModalOverlay.addEventListener('click', (ev) => {
-    if (ev.target === codeModalOverlay) closeCodeModal();
-  });
-</script>
+      resultsTbody.innerHTML = "";
+
+      excelData.forEach((row, idx) => {
+        if (idx === 0) return; // header
+        const name = (row[0] || "").toString();
+        const price = (row[1] || "").toString(); // سنقرأ لكن لا نظهره
+        const scaleCode = (row[2] || "").toString();
+        const qr = (row[3] || "").toString();
+
+        const a = name.toLowerCase();
+        const c = scaleCode.toLowerCase();
+        const d = qr.toLowerCase();
+
+        if (a.includes(query) || c.includes(query) || d.includes(query)) {
+          // تأكد عدم وجود مكرر في الجدول اليمين (منع التكرار)
+          const exists = Array.from(resultsTbody.rows).some(r => {
+            const rQr = (r.cells[2] && r.cells[2].textContent) || "";
+            const rCode = (r.cells[1] && r.cells[1].textContent) || "";
+            return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
+          });
+          if (exists) {
+            // نعرض صف مختصر ينبه للمكرر
+            const tr = document.createElement('tr');
+            const td0 = document.createElement('td'); td0.textContent = name; tr.appendChild(td0);
+            const td1 = document.createElement('td'); td1.textContent = scaleCode; tr.appendChild(td1);
+            const td2 = document.createElement('td'); td2.textContent = qr; tr.appendChild(td2);
+            const td3 = document.createElement('td'); td3.textContent = ''; tr.appendChild(td3);
+            const td4 = document.createElement('td'); td4.textContent = 'مكرر'; tr.appendChild(td4);
+            resultsTbody.appendChild(tr);
+            return;
+          }
+
+          const tr = document.createElement('tr');
+          const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
+          const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
+          const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
+
+          const tdQty = document.createElement('td');
+          tdQty.textContent = ''; // سيُستكمل عبر النافذة
+          tr.appendChild(tdQty);
+
+          const tdAction = document.createElement('td');
+
+          const receiveBtn = document.createElement('button');
+          receiveBtn.className = 'addBtn';
+          receiveBtn.textContent = 'استلام';
+          receiveBtn.addEventListener('click', () => {
+            openQuantityModal(tr);
+          });
+          tdAction.appendChild(receiveBtn);
+
+          const moveBtn = document.createElement('button');
+          moveBtn.className = 'moveBtn';
+          moveBtn.style.marginRight = '6px';
+          moveBtn.textContent = 'نقل';
+          moveBtn.addEventListener('click', () => moveRowToCompleted(tr));
+          tdAction.appendChild(moveBtn);
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'delBtn';
+          deleteBtn.style.marginRight = '6px';
+          deleteBtn.textContent = 'حذف';
+          deleteBtn.addEventListener('click', () => { tr.remove(); checkClearAllVisibility(); });
+          tdAction.appendChild(deleteBtn);
+
+          tr.appendChild(tdAction);
+          resultsTbody.appendChild(tr);
+
+          // لو البحث جاء من الماسح WITH exact match: نفتح مباشرة نافذة الكمية
+          const exactMatch = ((d && d === query) || (c && c === query));
+          if (fromScanner && exactMatch) {
+            openQuantityModal(tr);
+          }
+        }
+      });
+
+      // تفريغ شريط البحث لو جاء من الماسح
+      if (fromScanner) {
+        searchBar.value = "";
+        searchBar.dispatchEvent(new Event('input'));
+      }
+    }
+
+    function clearSearch() {
+      searchBar.value = "";
+      resultsTbody.innerHTML = "";
+    }
+
+    /**************************************************************************
+     * لوحة رقمية منبثقة لإدخال الكمية/الوزن (القيمة تعرض دائماً بالكجم)
+     **************************************************************************/
+    function openQuantityModal(row) {
+      // منع فتح أكثر من نافذة
+      if (modalOverlay.style.display === 'flex') return;
+      pendingRowForValue = { rowEl: row };
+      modalInput.value = '';
+      modalOverlay.style.display = 'flex';
+      modalInput.focus();
+    }
+
+    function closeModal() {
+      modalOverlay.style.display = 'none';
+      pendingRowForValue = null;
+    }
+
+    function modalDigit(d) {
+      modalInput.value = (modalInput.value || "") + d;
+    }
+    function modalDot() {
+      if (!modalInput.value.includes('.')) modalInput.value = (modalInput.value || "") + '.';
+    }
+    function modalBack() {
+      modalInput.value = (modalInput.value || "").slice(0, -1);
+    }
+
+    function confirmModal() {
+      const raw = (modalInput.value || "").trim();
+      const val = parseFloat(raw);
+      if (!raw || isNaN(val) || val <= 0) {
+        // إظهار رسالة مؤقتة تفيد عدم إدخال قيمة صحيحة
+        alert("لم يتم إدخال قيمة صالحة. الرجاء إدخال قيمة كمية بالكيلوغرام أكبر من صفر.");
+        modalInput.focus();
+        return;
+      }
+      if (!pendingRowForValue || !pendingRowForValue.rowEl) {
+        closeModal();
+        return;
+      }
+      const tr = pendingRowForValue.rowEl;
+      const qtyCell = tr.cells[3];
+      // إن كان هناك قيمة سابقة نريد عرض البادج القديم
+      const oldVal = qtyCell.getAttribute('data-qty') || '';
+      if (oldVal) {
+        showOldValueBadge(tr, oldVal);
+      }
+      qtyCell.textContent = val.toString() + ' كجم';
+      qtyCell.setAttribute('data-qty', String(val));
+      // إظهار زر النقل إن كان مخفي
+      const actionCell = tr.cells[4];
+      const btns = actionCell.querySelectorAll('button');
+      btns.forEach(b => b.style.display = '');
+      tr.classList.remove('no-value');
+      closeModal();
+    }
+
+    function cancelModal() {
+      // عند الإلغاء: إذا لم تكن هناك قيمة سابقاً نعلّم الصف بالأحمر ونخفي زر الاستلام
+      if (pendingRowForValue && pendingRowForValue.rowEl) {
+        const tr = pendingRowForValue.rowEl;
+        const qtyCell = tr.cells[3];
+        const existing = qtyCell.getAttribute('data-qty') || '';
+        if (!existing) {
+          tr.classList.add('no-value');
+          // نزيل زر الاستلام حتى يُدخل قيمة
+          const actionCell = tr.cells[4];
+          const btns = actionCell.querySelectorAll('button');
+          btns.forEach(b => {
+            if (b.classList.contains('addBtn')) b.style.display = 'none';
+          });
+        }
+      }
+      closeModal();
+    }
+
+    // عرض بادج صغير للقيمة القديمة بجانب الخانة (لبضع ثواني)
+    function showOldValueBadge(row, oldVal) {
+      const cell = row.cells[3];
+      const rect = cell.getBoundingClientRect();
+      oldValuePopup.textContent = 'القيمة القديمة: ' + oldVal + ' كجم';
+      oldValuePopup.style.top = (rect.top - 36) + 'px';
+      oldValuePopup.style.left = (rect.left - 10) + 'px';
+      oldValuePopup.style.display = 'block';
+      setTimeout(() => { oldValuePopup.style.display = 'none'; }, 1800);
+    }
+
+    /**************************************************************************
+     * إضافة / نقل من سجل الاستلام (اليمين) إلى المكتمل (اليسار)
+     **************************************************************************/
+    function moveRowToCompleted(row) {
+      // تأكد أن هناك قيمة
+      const qtyCell = row.cells[3];
+      const qty = parseFloat(qtyCell.getAttribute('data-qty') || '');
+      if (!qty || isNaN(qty) || qty <= 0) {
+        alert('لا يمكن نقل عنصر بدون قيمة. الرجاء إدخال كمية/وزن أولاً.');
+        return;
+      }
+
+      const name = (row.cells[0] && row.cells[0].textContent) || '';
+      const scaleCode = (row.cells[1] && row.cells[1].textContent) || '';
+      const qr = (row.cells[2] && row.cells[2].textContent) || '';
+
+      // منع التكرار في الجدول الأيسر
+      const existsLeft = Array.from(finalTbody.rows).some(r => {
+        const rQr = (r.cells[2] && r.cells[2].textContent) || "";
+        const rCode = (r.cells[1] && r.cells[1].textContent) || "";
+        return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
+      });
+      if (existsLeft) {
+        alert('العنصر موجود مسبقاً في جدول المنتجات المكتملة. النقل مرفوض.');
+        return;
+      }
+
+      const tr = document.createElement('tr');
+      const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
+      const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
+      const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
+      const td3 = document.createElement('td'); td3.textContent = qty + ' كجم'; td3.setAttribute('data-qty', String(qty)); tr.appendChild(td3);
+
+      const tdAction = document.createElement('td');
+      const delBtn = document.createElement('button');
+      delBtn.className = 'delBtn';
+      delBtn.textContent = 'حذف';
+      delBtn.addEventListener('click', function() {
+        this.closest('tr').remove();
+        checkClearAllVisibility();
+      });
+      tdAction.appendChild(delBtn);
+      tr.appendChild(tdAction);
+
+      finalTbody.appendChild(tr);
+
+      // نزيل الصف من اليمين بعد النقل
+      row.remove();
+      checkClearAllVisibility();
+    }
+
+    function moveAllToCompleted() {
+      // نجمع كل الصفوف التي لها قيمة صحيحة ونحاول نقلها
+      const rows = Array.from(resultsTbody.rows);
+      let movedAny = false;
+      for (const row of rows) {
+        const qtyCell = row.cells[3];
+        const qty = parseFloat(qtyCell.getAttribute('data-qty') || '');
+        if (qty && !isNaN(qty) && qty > 0) {
+          // محاولة النقل
+          const name = (row.cells[0] && row.cells[0].textContent) || '';
+          const scaleCode = (row.cells[1] && row.cells[1].textContent) || '';
+          const qr = (row.cells[2] && row.cells[2].textContent) || '';
+
+          // منع تكرار في الأيسر
+          const existsLeft = Array.from(finalTbody.rows).some(r => {
+            const rQr = (r.cells[2] && r.cells[2].textContent) || "";
+            const rCode = (r.cells[1] && r.cells[1].textContent) || "";
+            return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
+          });
+          if (!existsLeft) {
+            const tr = document.createElement('tr');
+            const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
+            const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
+            const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
+            const td3 = document.createElement('td'); td3.textContent = qty + ' كجم'; td3.setAttribute('data-qty', String(qty)); tr.appendChild(td3);
+            const tdAction = document.createElement('td');
+            const delBtn = document.createElement('button');
+            delBtn.className = 'delBtn';
+            delBtn.textContent = 'حذف';
+            delBtn.addEventListener('click', function() {
+              this.closest('tr').remove();
+              checkClearAllVisibility();
+            });
+            tdAction.appendChild(delBtn);
+            tr.appendChild(tdAction);
+            finalTbody.appendChild(tr);
+            row.remove();
+            movedAny = true;
+          }
+        }
+      }
+      if (!movedAny) alert('لا توجد منتجات بالقيم المطلوبة للنقل.');
+      checkClearAllVisibility();
+    }
+
+    function clearCompleted() {
+      if (!confirm('هل تريد حذف جميع المنتجات المكتملة؟')) return;
+      finalTbody.innerHTML = '';
+      checkClearAllVisibility();
+    }
+    function clearAllCompleted() {
+      // زر غير مستخدم هنا
+      finalTbody.innerHTML = '';
+      checkClearAllVisibility();
+    }
+
+    function checkClearAllVisibility() {
+      if (!finalTbody || finalTbody.rows.length === 0) {
+        document.getElementById('clearAllBtn').style.display = 'none';
+      } else {
+        document.getElementById('clearAllBtn').style.display = 'inline-block';
+      }
+      // زر حذف الكل في الأعلى جدول المكتمل
+      if (!finalTbody || finalTbody.rows.length === 0) {
+        document.getElementById('deleteAllCompleted').style.display = 'none';
+      } else {
+        document.getElementById('deleteAllCompleted').style.display = '';
+      }
+    }
+
+    /**************************************************************************
+     * قارئ QR — يبقى يعمل حتى نغلقه يدوياً؛ عند كل مسح يضيف سجل إلى اليمين
+     **************************************************************************/
+    function toggleScanner() {
+      if (scanningMode === 'qr') {
+        stopScanner();
+        return;
+      }
+      startScanner();
+    }
+
+    function startScanner() {
+      scanningMode = 'qr';
+      reader.style.display = 'block';
+      cameraBtn.textContent = '✖ إيقاف الكاميرا';
+      const scanner = new Html5Qrcode("reader");
+      const config = { fps: 8, qrbox: 200 };
+      scanner.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText, decodedResult) => {
+          handleDecodedFromScanner(String(decodedText || ""));
+        },
+        (errorMessage) => {
+          // ignore decode errors
+        }
+      ).then(() => {
+        qrScanner = scanner;
+      }).catch(err => {
+        alert("فشل تشغيل الكاميرا: " + err);
+        reader.style.display = 'none';
+        scanningMode = null;
+        cameraBtn.textContent = '📷 كاميرا';
+      });
+    }
+
+    function handleDecodedFromScanner(decodedText) {
+      if (!decodedText) return;
+      const now = Date.now();
+      if (decodedText === lastScan.text && (now - lastScan.time) < 1000) {
+        lastScan.time = now;
+        return;
+      }
+      lastScan.text = decodedText;
+      lastScan.time = now;
+
+      // نبحث في الاكسل عن هذا الكود ونضيف صف إلى اليمين (إذا لم يكن مكرر)
+      if (!Array.isArray(excelData) || excelData.length === 0) return;
+      const query = decodedText.trim().toLowerCase();
+
+      let found = false;
+      excelData.forEach((row, idx) => {
+        if (idx === 0) return;
+        const name = (row[0] || "").toString();
+        const scaleCode = (row[2] || "").toString();
+        const qr = (row[3] || "").toString();
+
+        if (qr.toLowerCase() === query || scaleCode.toLowerCase() === query) {
+          found = true;
+          // تحقق من مكرر في اليمين
+          const exists = Array.from(resultsTbody.rows).some(r => {
+            const rQr = (r.cells[2] && r.cells[2].textContent) || "";
+            const rCode = (r.cells[1] && r.cells[1].textContent) || "";
+            return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
+          });
+          if (exists) {
+            // نعرض تلميح بصري مؤقت
+            // (لا نضيف مكرر)
+            flashRowMessage('هذا المنتج موجود مسبقاً في سجل الاستلام.');
+            return;
+          }
+
+          // إنشاء صف جديد في اليمين ثم فتح النافذة لإدخال القيمة
+          const tr = document.createElement('tr');
+          const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
+          const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
+          const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
+          const td3 = document.createElement('td'); td3.textContent = ''; tr.appendChild(td3);
+          const td4 = document.createElement('td');
+          const receiveBtn = document.createElement('button');
+          receiveBtn.className = 'addBtn';
+          receiveBtn.textContent = 'استلام';
+          receiveBtn.addEventListener('click', () => openQuantityModal(tr));
+          td4.appendChild(receiveBtn);
+          const moveBtn = document.createElement('button');
+          moveBtn.className = 'moveBtn';
+          moveBtn.style.marginRight = '6px';
+          moveBtn.textContent = 'نقل';
+          moveBtn.addEventListener('click', () => moveRowToCompleted(tr));
+          td4.appendChild(moveBtn);
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'delBtn';
+          deleteBtn.style.marginRight = '6px';
+          deleteBtn.textContent = 'حذف';
+          deleteBtn.addEventListener('click', () => { tr.remove(); checkClearAllVisibility(); });
+          td4.appendChild(deleteBtn);
+
+          tr.appendChild(td4);
+          resultsTbody.appendChild(tr);
+
+          // نفتح النافذة لإدخال القيمة فوراً
+          openQuantityModal(tr);
+        }
+      });
+      if (!found) {
+        flashRowMessage('لم يتم العثور على المنتج في القالب.');
+      }
+    }
+
+    function stopScanner() {
+      if (qrScanner) {
+        qrScanner.stop().then(() => {
+          qrScanner.clear();
+          qrScanner = null;
+          reader.style.display = 'none';
+          scanningMode = null;
+          cameraBtn.textContent = '📷 كاميرا';
+        }).catch(err => {
+          console.warn("خطأ عند إيقاف الماسح:", err);
+          reader.style.display = 'none';
+          scanningMode = null;
+          cameraBtn.textContent = '📷 كاميرا';
+        });
+      } else {
+        reader.style.display = 'none';
+        scanningMode = null;
+        cameraBtn.textContent = '📷 كاميرا';
+      }
+    }
+
+    function flashRowMessage(msg) {
+      // رسالة بسيطة مؤقتة في أعلى الصفحة
+      const el = document.createElement('div');
+      el.textContent = msg;
+      el.style.position = 'fixed';
+      el.style.top = '50px';
+      el.style.right = '18px';
+      el.style.background = '#333';
+      el.style.color = '#fff';
+      el.style.padding = '8px 12px';
+      el.style.borderRadius = '6px';
+      el.style.zIndex = 300;
+      document.body.appendChild(el);
+      setTimeout(() => { el.remove(); }, 1600);
+    }
+
+    /**************************************************************************
+     * ربط أحداث الواجهة
+     **************************************************************************/
+    document.getElementById('searchBtn').addEventListener('click', () => search(false));
+    document.getElementById('clearBtn').addEventListener('click', clearSearch);
+    searchBar.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        search(false);
+      }
+    });
+
+    /**************************************************************************
+     * تصدير Excel (بعد إدخال اسم المورد في نافذة prompt بسيطة)
+     **************************************************************************/
+    function exportCompleted() {
+      if (!finalTbody || finalTbody.rows.length === 0) {
+        alert('لا توجد منتجات مكتملة للتصدير.');
+        return;
+      }
+      const supplier = prompt('أدخل اسم المورد لحفظ الفاتورة:');
+      if (!supplier) {
+        alert('يجب إدخال اسم المورد لإتمام الحفظ.');
+        return;
+      }
+
+      // بناء مصفوفة لتصديرها
+      const rows = [['اسم المورد', supplier], []];
+      rows.push(['اسم المنتج', 'كود الميزان', 'QR Code', 'الكمية (كجم)']);
+      Array.from(finalTbody.rows).forEach(tr => {
+        const name = (tr.cells[0] && tr.cells[0].textContent) || '';
+        const code = (tr.cells[1] && tr.cells[1].textContent) || '';
+        const qr = (tr.cells[2] && tr.cells[2].textContent) || '';
+        const qty = (tr.cells[3] && tr.cells[3].getAttribute('data-qty')) || '';
+        rows.push([name, code, qr, qty]);
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, "استلامات");
+      const fileName = 'receipts_' + supplier.replace(/\s+/g,'_') + '.xlsx';
+      XLSX.writeFile(wb, fileName);
+    }
+
+    /**************************************************************************
+     * وظائف حذف / تفريغ
+     **************************************************************************/
+    function clearAllSelected() {
+      resultsTbody.innerHTML = '';
+    }
+
+    /**************************************************************************
+     * اختصارات لوحة المفاتيح للتطبيق
+     **************************************************************************/
+    document.addEventListener('keydown', function(e) {
+      if (app.style.display === 'block') {
+        if (e.key === 'Enter') {
+          if (document.activeElement === passwordInput) return;
+          e.preventDefault();
+          search(false);
+        } else if (e.key === 'Delete') {
+          if (finalTbody && finalTbody.rows.length > 0) {
+            finalTbody.deleteRow(finalTbody.rows.length - 1);
+            checkClearAllVisibility();
+          }
+        }
+      }
+    });
+
+    /**************************************************************************
+     * Copy modal logic
+     **************************************************************************/
+    const copyCodeBtn = document.getElementById('copyCodeBtn');
+    const codeModalOverlay = document.getElementById('codeModalOverlay');
+    const codeArea = document.getElementById('codeArea');
+    const copyToClipboardBtn = document.getElementById('copyToClipboardBtn');
+    const downloadCodeBtn = document.getElementById('downloadCodeBtn');
+
+    async function fetchSource() {
+      try {
+        const rawUrl = 'https://raw.githubusercontent.com/abdalam142/002/main/index.html';
+        const res = await fetch(rawUrl);
+        if (res.ok) {
+          return await res.text();
+        }
+      } catch(e) {
+        // fallback
+      }
+      return '<!-- نسخة من DOM الحالي -->\n' + document.documentElement.outerHTML;
+    }
+
+    async function openCodeModal() {
+      codeArea.value = '...جارٍ التحميل';
+      codeModalOverlay.style.display = 'flex';
+      const src = await fetchSource();
+      codeArea.value = src;
+      codeArea.select();
+    }
+
+    function closeCodeModal() {
+      codeModalOverlay.style.display = 'none';
+    }
+
+    copyCodeBtn.addEventListener('click', openCodeModal);
+    copyToClipboardBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(codeArea.value);
+        copyToClipboardBtn.textContent = 'تم النسخ ✓';
+        setTimeout(() => copyToClipboardBtn.textContent = 'نسخ للحافظة', 1400);
+      } catch(e) {
+        alert('فشل النسخ. يمكنك تحديد النص ونسخه يدوياً.');
+      }
+    });
+
+    downloadCodeBtn.addEventListener('click', () => {
+      const blob = new Blob([codeArea.value], {type:'text/html;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'index.html';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    codeModalOverlay.addEventListener('click', (ev) => {
+      if (ev.target === codeModalOverlay) closeCodeModal();
+    });
+
+  </script>
+</body>
+</html>
