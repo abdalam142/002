@@ -44,59 +44,6 @@
     #status.active { background: var(--success); }
     #status.inactive { background: var(--danger); }
 
-    /* شاشة الباسورد */
-    #loginBox {
-      background: var(--card-bg);
-      padding: 14px;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      max-width: 420px;
-      margin: 10px auto;
-      text-align: center;
-    }
-    #passwordInput {
-      width: 100%;
-      max-width: 260px;
-      padding: 10px;
-      font-size: 20px;
-      text-align: center;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-    }
-    .numpad {
-      width: 260px;
-      margin: 12px auto 0;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-    .numpad button {
-      padding: 12px;
-      font-size: 18px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      background: #f3f3f3;
-      cursor: pointer;
-    }
-    #passError {
-      display: none;
-      margin-top: 10px;
-      color: #842029;
-      background: #f8d7da;
-      border: 1px solid #f5c2c7;
-      padding: 8px 10px;
-      border-radius: 6px;
-      width: 90%;
-      max-width: 320px;
-      margin-inline: auto;
-      box-sizing: border-box;
-    }
-
-    /* التطبيق */
-    #app {
-      display: none;
-      margin-top: 14px;
-    }
     .searchRow {
       text-align: center;
       margin-bottom: 12px;
@@ -263,32 +210,8 @@
 <body>
   <h2>استلام منتجات</h2>
 
-  <!-- مؤشر حالة ملف الإكسل -->
   <div id="status" class="inactive">لا يوجد ملف فعال</div>
 
-  <!-- شاشة الباسورد -->
-  <div id="loginBox" aria-live="polite">
-    <input id="passwordInput" type="password" placeholder="ادخل كلمة المرور" aria-label="كلمة المرور">
-    <div class="numpad" style="margin-top:12px;">
-      <button onclick="pressDigit('1')">1</button>
-      <button onclick="pressDigit('2')">2</button>
-      <button onclick="pressDigit('3')">3</button>
-      <button onclick="pressDigit('4')">4</button>
-      <button onclick="pressDigit('5')">5</button>
-      <button onclick="pressDigit('6')">6</button>
-      <button onclick="pressDigit('7')">7</button>
-      <button onclick="pressDigit('8')">8</button>
-      <button onclick="pressDigit('9')">9</button>
-      <button onclick="backspacePass()">⌫</button>
-      <button onclick="pressDigit('0')">0</button>
-      <button onclick="submitPass()">⏎</button>
-    </div>
-
-    <!-- رسالة الخطأ داخل الصفحة -->
-    <div id="passError" role="alert" aria-live="assertive"></div>
-  </div>
-
-  <!-- التطبيق -->
   <div id="app">
     <div class="searchRow" role="region" aria-label="شريط البحث">
       <input id="searchBar" type="text" placeholder="اكتب الاسم أو الباركود أو وصف المنتج" aria-label="بحث">
@@ -298,11 +221,9 @@
       <button id="moveAllBtn" class="btn" style="background:#0b5ed7;color:#fff;" onclick="moveAllToCompleted()">نقل كل المنتجات</button>
     </div>
 
-    <!-- قارئ QR يظهر هنا أعلى اليسار -->
     <div id="reader" aria-hidden="true"></div>
 
     <div class="tables">
-      <!-- جدول اليمين: سجل الاستلام (التسجيل الأولي) -->
       <div class="col" aria-label="سجل الاستلام">
         <h3>سجل الاستلام (تسجيل)</h3>
         <div style="text-align:left; margin-bottom:6px;">
@@ -322,7 +243,6 @@
         </table>
       </div>
 
-      <!-- جدول اليسار: المكتمل -->
       <div class="col" aria-label="المكتمل">
         <h3>المنتجات المكتملة</h3>
         <div style="text-align:left; margin-bottom:6px;">
@@ -345,7 +265,6 @@
     </div>
   </div>
 
-  <!-- نافذة رقمية منبثقة لإدخال الكمية/الوزن -->
   <div id="modalOverlay" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal" role="document">
       <h4 id="modalTitle">ادخل الكمية / الوزن (كجم)</h4>
@@ -364,7 +283,6 @@
     </div>
   </div>
 
-  <!-- نافذة صغيرة لعرض القيمة القديمة عند التعديل (ستظهر بجانب الخانة) -->
   <div id="oldValuePopup" style="position:fixed; display:none; z-index:220; background:#333; color:#fff; padding:6px 8px; border-radius:6px; font-size:13px;"></div>
 
   <script>
@@ -375,13 +293,9 @@
     let qrScanner = null;      // مثيل html5-qrcode
     let scanningMode = null;   // 'qr' أو null
     let lastScan = { text: null, time: 0 };
-    const correctPassword = "10100"; // كلمة المرور كما كانت
 
     /* عناصر DOM */
     const statusEl = document.getElementById('status');
-    const loginBox = document.getElementById('loginBox');
-    const passwordInput = document.getElementById('passwordInput');
-    const passErrorBox = document.getElementById('passError');
     const app = document.getElementById('app');
 
     const searchBar = document.getElementById('searchBar');
@@ -394,15 +308,14 @@
     const modalInput = document.getElementById('modalInput');
     const oldValuePopup = document.getElementById('oldValuePopup');
 
-    // خريطة لتتبع الصف الحالي الذي نطلب له القيمة من النافذة
-    let pendingRowForValue = null; // {rowEl, rowIndex, sourceRowData}
+    let pendingRowForValue = null; // {rowEl}
 
-    // اسم ملف الإكسل المصدر (يقرا عند البداية)
     const sourceXlsxName = "product.template(176).xlsx";
 
-    /**************************************************************************
-     * قراءة ملف الإكسل عند التحميل (كما كان)
-     **************************************************************************/
+    // أظهر التطبيق مباشرة (حذف صفحة الباسورد)
+    app.style.display = 'block';
+
+    // محاولة قراءة ملف الإكسل المصدر عند التحميل
     fetch(sourceXlsxName)
       .then(res => res.arrayBuffer())
       .then(data => {
@@ -425,49 +338,7 @@
       });
 
     /**************************************************************************
-     * دوال الباسورد والكيبود الأصلي
-     **************************************************************************/
-    passwordInput.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        submitPass();
-      } else {
-        clearError();
-      }
-    });
-    passwordInput.addEventListener('input', function() { clearError(); });
-
-    function pressDigit(d) {
-      passwordInput.value = (passwordInput.value || "") + d;
-      clearError();
-    }
-    function backspacePass() {
-      passwordInput.value = (passwordInput.value || "").slice(0, -1);
-      clearError();
-    }
-    function submitPass() {
-      if ((passwordInput.value || "") === correctPassword) {
-        loginBox.style.display = "none";
-        app.style.display = "block";
-        clearError();
-        setTimeout(() => { if (searchBar) searchBar.focus(); }, 150);
-      } else {
-        showError("كلمة المرور غير صحيحة");
-      }
-    }
-    function showError(msg) {
-      if (!passErrorBox) return;
-      passErrorBox.textContent = msg;
-      passErrorBox.style.display = "block";
-    }
-    function clearError() {
-      if (!passErrorBox) return;
-      passErrorBox.textContent = "";
-      passErrorBox.style.display = "none";
-    }
-
-    /**************************************************************************
-     * دوال البحث وإظهار نتائج (اليمين) — حذف عمود السعر من العرض
+     * البحث وإظهار النتائج
      **************************************************************************/
     function search(fromScanner = false, value = '') {
       const query = fromScanner ? (String(value || "")).trim().toLowerCase() : (searchBar.value || "").trim().toLowerCase();
@@ -485,7 +356,7 @@
       excelData.forEach((row, idx) => {
         if (idx === 0) return; // header
         const name = (row[0] || "").toString();
-        const price = (row[1] || "").toString(); // سنقرأ لكن لا نظهره
+        const price = (row[1] || "").toString(); // نقرأه لكن لا نظهره
         const scaleCode = (row[2] || "").toString();
         const qr = (row[3] || "").toString();
 
@@ -494,14 +365,12 @@
         const d = qr.toLowerCase();
 
         if (a.includes(query) || c.includes(query) || d.includes(query)) {
-          // تأكد عدم وجود مكرر في الجدول اليمين (منع التكرار)
           const exists = Array.from(resultsTbody.rows).some(r => {
             const rQr = (r.cells[2] && r.cells[2].textContent) || "";
             const rCode = (r.cells[1] && r.cells[1].textContent) || "";
             return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
           });
           if (exists) {
-            // نعرض صف مختصر ينبه للمكرر
             const tr = document.createElement('tr');
             const td0 = document.createElement('td'); td0.textContent = name; tr.appendChild(td0);
             const td1 = document.createElement('td'); td1.textContent = scaleCode; tr.appendChild(td1);
@@ -517,46 +386,29 @@
           const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
           const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
 
-          const tdQty = document.createElement('td');
-          tdQty.textContent = ''; // سيُستكمل عبر النافذة
-          tr.appendChild(tdQty);
-
+          const tdQty = document.createElement('td'); tdQty.textContent = ''; tr.appendChild(tdQty);
           const tdAction = document.createElement('td');
 
-          const receiveBtn = document.createElement('button');
-          receiveBtn.className = 'addBtn';
-          receiveBtn.textContent = 'استلام';
-          receiveBtn.addEventListener('click', () => {
-            openQuantityModal(tr);
-          });
+          const receiveBtn = document.createElement('button'); receiveBtn.className = 'addBtn'; receiveBtn.textContent = 'استلام';
+          receiveBtn.addEventListener('click', () => openQuantityModal(tr));
           tdAction.appendChild(receiveBtn);
 
-          const moveBtn = document.createElement('button');
-          moveBtn.className = 'moveBtn';
-          moveBtn.style.marginRight = '6px';
-          moveBtn.textContent = 'نقل';
+          const moveBtn = document.createElement('button'); moveBtn.className = 'moveBtn'; moveBtn.style.marginRight = '6px'; moveBtn.textContent = 'نقل';
           moveBtn.addEventListener('click', () => moveRowToCompleted(tr));
           tdAction.appendChild(moveBtn);
 
-          const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'delBtn';
-          deleteBtn.style.marginRight = '6px';
-          deleteBtn.textContent = 'حذف';
+          const deleteBtn = document.createElement('button'); deleteBtn.className = 'delBtn'; deleteBtn.style.marginRight = '6px'; deleteBtn.textContent = 'حذف';
           deleteBtn.addEventListener('click', () => { tr.remove(); checkClearAllVisibility(); });
           tdAction.appendChild(deleteBtn);
 
           tr.appendChild(tdAction);
           resultsTbody.appendChild(tr);
 
-          // لو البحث جاء من الماسح WITH exact match: نفتح مباشرة نافذة الكمية
           const exactMatch = ((d && d === query) || (c && c === query));
-          if (fromScanner && exactMatch) {
-            openQuantityModal(tr);
-          }
+          if (fromScanner && exactMatch) openQuantityModal(tr);
         }
       });
 
-      // تفريغ شريط البحث لو جاء من الماسح
       if (fromScanner) {
         searchBar.value = "";
         searchBar.dispatchEvent(new Event('input'));
@@ -565,4 +417,104 @@
 
     function clearSearch() {
       searchBar.value = "";
-      resultsTbody.i
+      resultsTbody.innerHTML = "";
+    }
+
+    /**************************************************************************
+     * نافذة إدخال الكمية (دائماً بالكجم)
+     **************************************************************************/
+    function openQuantityModal(row) {
+      if (modalOverlay.style.display === 'flex') return;
+      pendingRowForValue = { rowEl: row };
+      modalInput.value = '';
+      modalOverlay.style.display = 'flex';
+      modalInput.focus();
+    }
+    function closeModal() {
+      modalOverlay.style.display = 'none';
+      pendingRowForValue = null;
+    }
+    function modalDigit(d) { modalInput.value = (modalInput.value || "") + d; }
+    function modalDot() { if (!modalInput.value.includes('.')) modalInput.value = (modalInput.value || "") + '.'; }
+    function modalBack() { modalInput.value = (modalInput.value || "").slice(0, -1); }
+
+    function confirmModal() {
+      const raw = (modalInput.value || "").trim();
+      const val = parseFloat(raw);
+      if (!raw || isNaN(val) || val <= 0) {
+        alert("لم يتم إدخال قيمة صالحة. الرجاء إدخال قيمة كمية بالكيلوغرام أكبر من صفر.");
+        modalInput.focus();
+        return;
+      }
+      if (!pendingRowForValue || !pendingRowForValue.rowEl) { closeModal(); return; }
+      const tr = pendingRowForValue.rowEl;
+      const qtyCell = tr.cells[3];
+      const oldVal = qtyCell.getAttribute('data-qty') || '';
+      if (oldVal) showOldValueBadge(tr, oldVal);
+      qtyCell.textContent = val.toString() + ' كجم';
+      qtyCell.setAttribute('data-qty', String(val));
+      const actionCell = tr.cells[4];
+      const btns = actionCell.querySelectorAll('button');
+      btns.forEach(b => b.style.display = '');
+      tr.classList.remove('no-value');
+      closeModal();
+    }
+
+    function cancelModal() {
+      if (pendingRowForValue && pendingRowForValue.rowEl) {
+        const tr = pendingRowForValue.rowEl;
+        const qtyCell = tr.cells[3];
+        const existing = qtyCell.getAttribute('data-qty') || '';
+        if (!existing) {
+          tr.classList.add('no-value');
+          const actionCell = tr.cells[4];
+          const btns = actionCell.querySelectorAll('button');
+          btns.forEach(b => { if (b.classList.contains('addBtn')) b.style.display = 'none'; });
+        }
+      }
+      closeModal();
+    }
+
+    function showOldValueBadge(row, oldVal) {
+      const cell = row.cells[3];
+      const rect = cell.getBoundingClientRect();
+      oldValuePopup.textContent = 'القيمة القديمة: ' + oldVal + ' كجم';
+      oldValuePopup.style.top = (rect.top - 36) + 'px';
+      oldValuePopup.style.left = (rect.left - 10) + 'px';
+      oldValuePopup.style.display = 'block';
+      setTimeout(() => { oldValuePopup.style.display = 'none'; }, 1800);
+    }
+
+    /**************************************************************************
+     * نقل/إضافة إلى المكتمل
+     **************************************************************************/
+    function moveRowToCompleted(row) {
+      const qtyCell = row.cells[3];
+      const qty = parseFloat(qtyCell.getAttribute('data-qty') || '');
+      if (!qty || isNaN(qty) || qty <= 0) { alert('لا يمكن نقل عنصر بدون قيمة. الرجاء إدخال كمية/وزن أولاً.'); return; }
+
+      const name = (row.cells[0] && row.cells[0].textContent) || '';
+      const scaleCode = (row.cells[1] && row.cells[1].textContent) || '';
+      const qr = (row.cells[2] && row.cells[2].textContent) || '';
+
+      const existsLeft = Array.from(finalTbody.rows).some(r => {
+        const rQr = (r.cells[2] && r.cells[2].textContent) || "";
+        const rCode = (r.cells[1] && r.cells[1].textContent) || "";
+        return (rQr && rQr === qr) || (rCode && rCode === scaleCode);
+      });
+      if (existsLeft) { alert('العنصر موجود مسبقاً في جدول المنتجات المكتملة. النقل مرفوض.'); return; }
+
+      const tr = document.createElement('tr');
+      const td0 = document.createElement('td'); td0.textContent = name || ""; tr.appendChild(td0);
+      const td1 = document.createElement('td'); td1.textContent = scaleCode || ""; tr.appendChild(td1);
+      const td2 = document.createElement('td'); td2.textContent = qr || ""; tr.appendChild(td2);
+      const td3 = document.createElement('td'); td3.textContent = qty + ' كجم'; td3.setAttribute('data-qty', String(qty)); tr.appendChild(td3);
+
+      const tdAction = document.createElement('td');
+      const delBtn = document.createElement('button'); delBtn.className = 'delBtn'; delBtn.textContent = 'حذف';
+      delBtn.addEventListener('click', function() { this.closest('tr').remove(); checkClearAllVisibility(); });
+      tdAction.appendChild(delBtn);
+      tr.appendChild(tdAction);
+
+      finalTbody.appendChild(tr);
+  
