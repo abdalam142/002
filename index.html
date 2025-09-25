@@ -3,173 +3,218 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=1200" />
-  <title>نظام بحث واستلام المنتجات (Excel + QR)</title>
+  <title>بحث في المنتجات</title>
 
   <!-- مكتبات -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>
 
   <style>
-    :root{
-      --bg:#f6f7fb;
-      --card:#fff;
-      --muted:#6c757d;
-      --primary:#0d6efd;
-      --danger:#dc3545;
-      --success:#198754;
-
-      /* عرض الكاميرا الظاهري في الصفحة (CSS only). غير هذه القيم لتغيير العرض دون إضعاف دقة الكاميرا */
-      --camera-width: 300px;
-      --camera-height: 200px;
+    :root {
+      --card-bg: #ffffff;
+      --muted: #6c757d;
+      --primary: #0d6efd;
+      --success: #28a745;
+      --danger: #dc3545;
+      --accent: #20c997;
     }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f7fb;
+      color: #222;
+      margin: 0;
+      padding: 18px;
+      box-sizing: border-box;
+      direction: rtl;
+    }
+    h2 { text-align: center; margin: 6px 0 12px; }
 
-    html,body{height:100%; margin:0; background:var(--bg); font-family:Arial, sans-serif; direction:rtl}
-    .wrap{max-width:1200px; margin:18px auto; padding:16px;}
-    header{display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:12px}
-    header h1{font-size:20px; margin:0;}
-    .controls{display:flex; gap:8px; align-items:center}
-    input[type="text"]{padding:10px 12px; border-radius:8px; border:1px solid #ddd; width:420px; font-size:15px}
-    .btn{padding:9px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600}
-    .primary{background:var(--primary); color:#fff}
-    .ghost{background:#e9ecef'}
-    .small{padding:6px 8px; border-radius:6px; cursor:pointer}
-    .col{background:var(--card); padding:12px; border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.05); box-sizing:border-box}
-    .col.half{flex: 0 0 48%;}
-    .columns{display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;}
-    .table-wrapper{max-height:62vh; overflow:auto; border-radius:6px; background:var(--card); padding:6px}
-    table{width:100%; border-collapse:collapse; table-layout:fixed; word-wrap:break-word}
-    thead th{padding:8px; border:1px solid #e0e0e0; font-weight:700; background:#f2f2f2}
-    tbody td{padding:8px; border:1px solid #e6e6e6; text-align:center; vertical-align:middle}
-    .addBtn{background:var(--success); color:#fff; border:none; padding:6px 10px; border-radius:6px}
-    .delBtn{background:var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px}
-    .editBtn{background:#ffc107; color:#111; border:none; padding:6px 10px; border-radius:6px}
-    #status{position:fixed; top:12px; right:12px; padding:8px 12px; border-radius:8px; color:#fff; font-weight:700; z-index:60}
-    #status.inactive{background:var(--danger)} #status.active{background:var(--success)}
+    /* مؤشر حالة ملف الإكسل */
+    #status {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: #fff;
+      font-weight: 700;
+      z-index: 60;
+    }
+    #status.active { background: var(--success); }
+    #status.inactive { background: var(--danger); }
 
-    /* حاوية الكاميرا - تحكم بالعرض الظاهر فقط */
+    /* التطبيق */
+    #app {
+      margin-top: 6px;
+    }
+    .searchRow {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    #searchBar {
+      width: 60%;
+      max-width: 520px;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+      display: inline-block;
+    }
+    .btn {
+      padding: 10px 14px;
+      margin: 0 6px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .btn.primary { background: var(--primary); color: #fff; }
+    .btn.ghost { background: #e9ecef; }
+    .btn.camera { background: var(--accent); color: #fff; }
+    .btn.scale-active { background: #ffc107; color: #111; }
+
     #reader {
-      width: var(--camera-width);
-      height: var(--camera-height);
-      max-width: 100%;
+      width: 320px;
+      margin: 10px auto;
       display: none;
       border-radius: 8px;
       overflow: hidden;
       background: #000;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
-      margin-bottom:8px;
     }
-    /* html5-qrcode يحقن video/canvas - نجبرهم على مطابقة الحجم المرئي */
-    #reader video, #reader canvas {
-      width: var(--camera-width) !important;
-      height: var(--camera-height) !important;
-      object-fit: cover;
-      display: block;
+    /* Ensure html5-qrcode elements match container */
+    #reader video, #reader canvas { width: 320px !important; height: auto !important; object-fit: cover; display: block; }
+
+    .tables {
+      display: flex;
+      gap: 18px;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .col {
+      width: 48%;
+      background: var(--card-bg);
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+      box-sizing: border-box;
     }
 
-    @media (max-width:900px){
-      .col.half{flex: 0 0 100%}
-      #reader{ width: calc(var(--camera-width) - 40px); } /* تقلل قليلاً على الشاشات الصغيرة */
-      .controls{flex-direction:column; align-items:flex-start}
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      word-wrap: break-word;
     }
+    thead th {
+      background: #f2f2f2;
+      padding: 8px;
+      border: 1px solid #ddd;
+      font-weight: 600;
+    }
+    tbody td {
+      padding: 8px;
+      border: 1px solid #ddd;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    /* أعمدة بعرض ثابت (نسب) */
+    table th:nth-child(1), table td:nth-child(1) { width: 30%; }
+    table th:nth-child(2), table td:nth-child(2) { width: 18%; }
+    table th:nth-child(3), table td:nth-child(3) { width: 18%; }
+    table th:nth-child(4), table td:nth-child(4) { width: 18%; }
+    table th:nth-child(5), table td:nth-child(5) { width: 16%; }
+
+    .addBtn { background: #198754; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    .delBtn { background: var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+    #clearAllBtn { background: var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-bottom:8px; display:none; }
 
     /* مودال */
-    .modal-overlay{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:999}
+    .modal-overlay{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:999;}
     .modal{background:#fff; border-radius:10px; padding:14px; width:420px; max-width:95%; box-sizing:border-box;}
     .modal h4{margin:0 0 8px}
     .modal .modal-input{width:100%; padding:10px; font-size:20px; text-align:center; border-radius:8px; border:1px solid #ddd}
     .numpad{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px}
-    .numpad button{padding:12px; font-size:18px; border-radius:8px; border:1px solid #ccc; background:#f4f4f4; cursor:pointer}
+    .numpad button{padding:12px; font-size:18px; border-radius:8px; border:1px solid #ccc; background:#f3f3f3; cursor:pointer}
     .modal .actions{display:flex; gap:8px; justify-content:center; margin-top:12px}
-    .note{color:var(--muted); font-size:13px; margin-top:8px}
+    .dup-warning { background: #fff3cd; color: #664d03; padding:8px; border-radius:6px; margin:8px auto; max-width:520px; display:none; text-align:center; }
+
+    @media (max-width: 900px) {
+      .tables { flex-direction: column; }
+      .col { width: 100%; }
+      #reader { width: 100%; }
+      #searchBar { width: 85%; }
+    }
   </style>
 </head>
 <body>
+  <h2>بحث في المنتجات</h2>
+
   <div id="status" class="inactive">جارٍ محاولة تحميل ملف الإكسل...</div>
 
-  <div class="wrap">
-    <header>
-      <h1>نظام بحث واستلام المنتجات (Excel + QR)</h1>
-      <div class="controls">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <input id="searchBar" type="text" placeholder="ابحث بالاسم أو كود الميزان أو QR" aria-label="بحث">
-          <button id="searchBtn" class="btn primary">بحث</button>
-          <button id="clearBtn" class="btn ghost">حذف</button>
-        </div>
-        <div style="display:flex; align-items:center; gap:8px; margin-left:8px;">
-          <button id="cameraBtn" class="btn ghost">📷 الكاميرا</button>
-          <button id="scaleBtn" class="btn ghost">📶 فلتر كود الميزان</button>
-        </div>
-      </div>
-    </header>
-
-    <div style="margin-bottom:10px;">
-      <label for="fileInput">رفع ملف إكسل محلي (إذا لم يُقرأ تلقائياً): </label>
-      <input id="fileInput" type="file" accept=".xlsx,.xls" />
-      <span class="note">ترتيب الأعمدة بالإكسل: اسم - سعر - كود الميزان - QR. الصفحة تعرض الملف كما هو.</span>
+  <div id="app">
+    <div class="searchRow" role="region" aria-label="شريط البحث">
+      <input id="searchBar" type="text" placeholder="اكتب الاسم أو الباركود أو وصف المنتج" aria-label="بحث">
+      <button id="searchBtn" class="btn primary">بحث</button>
+      <button id="clearBtn" class="btn ghost">حذف</button>
+      <button id="cameraBtn" class="btn camera">📷 QR</button>
+      <button id="scaleBtn" class="btn camera">📶 كود الميزان</button>
     </div>
 
-    <div class="columns">
-      <!-- نتائج البحث (يمين) -->
-      <div class="col half" aria-label="نتائج البحث">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <h3 style="margin:0">نتائج البحث</h3>
-          <div><button id="clearResultsBtn" class="small ghost" style="display:none">حذف الكل</button></div>
-        </div>
+    <div class="dup-warning" id="dupWarning" role="alert"></div>
 
-        <div id="reader" aria-hidden="true"></div>
+    <div id="reader" aria-hidden="true"></div>
 
-        <div class="table-wrapper">
-          <table id="resultsTable" aria-live="polite">
-            <thead>
-              <tr>
-                <th>اسم المنتج</th>
-                <th>السعر</th>
-                <th>كود الميزان</th>
-                <th>QR Code</th>
-                <th>إجراء</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+    <div class="tables">
+      <div class="col" aria-label="نتائج البحث">
+        <h3>نتائج البحث</h3>
+        <div style="text-align:left; margin-bottom:6px;">
+          <button id="clearResultsBtn" style="display:none;" class="btn ghost">حذف الكل</button>
         </div>
+        <table id="results" aria-live="polite">
+          <thead>
+            <tr>
+              <th>اسم المنتج</th>
+              <th>سعر المنتج</th>
+              <th>كود الميزان</th>
+              <th>QR Code</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
 
-      <!-- المنتجات المختارة (شمال) -->
-      <div class="col half" aria-label="المنتجات المختارة">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <h3 style="margin:0">المنتجات المختارة</h3>
-          <div>
-            <button id="clearAllBtn" class="small ghost" style="display:none">حذف الكل</button>
-            <button id="exportBtn" class="small primary">تصدير إكسل</button>
-          </div>
+      <div class="col" aria-label="المنتجات المختارة">
+        <h3>المنتجات المختارة</h3>
+        <div style="text-align:left; margin-bottom:6px;">
+          <button id="clearAllBtn" onclick="clearAllSelected()">حذف الكل</button>
         </div>
-
-        <div class="table-wrapper">
-          <table id="finalTable" aria-live="polite">
-            <thead>
-              <tr>
-                <th>اسم المنتج</th>
-                <th>العدد/الوزن</th>
-                <th>كود الميزان</th>
-                <th>QR</th>
-                <th>تعديل</th>
-                <th>حذف</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <table id="finalResults" aria-live="polite">
+          <thead>
+            <tr>
+              <th>اسم المنتج</th>
+              <th>العدد</th>
+              <th>كود الميزان</th>
+              <th>QR Code</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div style="margin-top:8px; text-align:left;">
+          <button id="exportBtn" class="btn primary">تصدير إكسل</button>
         </div>
       </div>
-    </div>
-
-    <div style="margin-top:14px; color:var(--muted); font-size:14px">
-      ملاحظة: الصفحة لا تعدّل ملف الإكسل الأصلي؛ تعرضه كما هو. التصدير من "المنتجات المختارة" سيكون مُنسّقًا.
     </div>
   </div>
 
   <!-- مودال الاستلام -->
-  <div class="modal-overlay" id="receiveModal" role="dialog" aria-modal="true">
-    <div class="modal" role="document" aria-labelledby="modalTitle">
+  <div class="modal-overlay" id="receiveModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <h4 id="modalTitle">استلام المنتج</h4>
       <div id="modalName" style="text-align:center; font-weight:700; margin-bottom:8px"></div>
       <input id="modalInput" class="modal-input" inputmode="decimal" placeholder="العدد أو الوزن (مثال: 2 أو 0.5)" autocomplete="off" />
@@ -195,10 +240,50 @@
   </div>
 
   <script>
-    /**************************************************************************
-     * إعدادات عامة
-     * ترتيب الأعمدة في الإكسل الوارد: [0]=اسم, [1]=سعر, [2]=كود الميزان, [3]=QR
-     **************************************************************************/
+    // إعدادات أعمدة الإكسل: [0]=اسم, [1]=سعر, [2]=كود الميزان, [3]=QR
+    const NAME_IDX = 0, PRICE_IDX = 1, CODE_IDX = 2, QR_IDX = 3;
+
+    // DOM
+    const statusEl = document.getElementById('status');
+    const dupWarningEl = document.getElementById('dupWarning');
+    const searchBar = document.getElementById('searchBar');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const cameraBtn = document.getElementById('cameraBtn');
+    const scaleBtn = document.getElementById('scaleBtn');
+    const reader = document.getElementById('reader');
+
+    const resultsTbody = document.querySelector('#results tbody');
+    const finalTbody = document.querySelector('#finalResults tbody');
+    const clearResultsBtn = document.getElementById('clearResultsBtn');
+    const clearAllBtnEl = document.getElementById('clearAllBtn');
+    const exportBtn = document.getElementById('exportBtn');
+
+    const receiveModalOverlay = document.getElementById('receiveModal');
+    const modalInput = document.getElementById('modalInput');
+    const modalName = document.getElementById('modalName');
+    const modalBack = document.getElementById('modalBack');
+    const modalCancel = document.getElementById('modalCancel');
+    const modalConfirm = document.getElementById('modalConfirm');
+
+    // Excel data
+    let excelData = []; // array of rows (arrays)
+    let startIndex = 1; // detect header if present
+
+    // final map to prevent duplicates (UID -> {rowEl, qty, rowArray})
+    const finalMap = new Map();
+
+    // scanner state
+    let qrScanner = null;
+    let scannerRunning = false;
+    let lastScan = { text: null, time: 0, tol: 800 };
+
+    // modal state
+    let modalCurrentSourceIndex = null; // index in excelData
+    let modalEditingUid = null;
+    let modalOpen = false;
+
+    // Excel candidate filenames to try
     const excelCandidates = [
       "products.xlsx",
       "product.template(176).xlsx",
@@ -209,163 +294,86 @@
       "عندك.xls"
     ];
 
-    let rawExcel = [];         // rows as-is from file (we do NOT modify source)
-    let startIndex = 1;        // assume header row by default
-    const NAME_IDX = 0, PRICE_IDX = 1, CODE_IDX = 2, QR_IDX = 3;
-
-    // DOM
-    const statusEl = document.getElementById('status');
-    const fileInput = document.getElementById('fileInput');
-    const searchBar = document.getElementById('searchBar');
-    const searchBtn = document.getElementById('searchBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const cameraBtn = document.getElementById('cameraBtn');
-    const scaleBtn = document.getElementById('scaleBtn');
-    const resultsTbody = document.querySelector('#resultsTable tbody');
-    const finalTbody = document.querySelector('#finalTable tbody');
-    const clearResultsBtn = document.getElementById('clearResultsBtn');
-    const clearAllBtn = document.getElementById('clearAllBtn');
-    const exportBtn = document.getElementById('exportBtn');
-    const readerDiv = document.getElementById('reader');
-
-    const receiveModalOverlay = document.getElementById('receiveModal');
-    const modalInput = document.getElementById('modalInput');
-    const modalName = document.getElementById('modalName');
-    const modalBackBtn = document.getElementById('modalBack');
-    const modalCancelBtn = document.getElementById('modalCancel');
-    const modalConfirmBtn = document.getElementById('modalConfirm');
-
-    // finalMap to prevent duplicates in final table: UID -> { rowEl, qty, rowArray }
-    const finalMap = new Map();
-
-    // scanner state
-    let html5QrCode = null;
-    let scannerRunning = false;
-    let lastScan = { text: null, time: 0, tolerance: 900 };
-
-    // modal state
-    let modalCurrentSourceIndex = null; // index in rawExcel when opened from results
-    let modalEditingUid = null;         // uid when editing existing final entry
-    let modalOpen = false;
-    let lastModalUid = null;
-    let lastModalTime = 0;
-    const MODAL_COOLDOWN = 800;
-
-    /**************************************************************************
-     * قراءة الإكسل
-     **************************************************************************/
-    function parseWorkbookArrayBuffer(buff, sourceName){
-      try {
-        const wb = XLSX.read(new Uint8Array(buff), { type: 'array' });
-        const firstSheet = wb.SheetNames[0];
-        rawExcel = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1 });
-        // detect textual header
-        if(rawExcel.length > 0){
-          const firstRowText = (rawExcel[0] || []).join(" ").toString();
-          if(/[a-zA-Z\u0600-\u06FF]/.test(firstRowText)) startIndex = 1; else startIndex = 0;
-        } else startIndex = 0;
-
-        statusEl.textContent = "ملف الإكسل متصل: " + (sourceName || firstSheet);
-        statusEl.className = "active";
-      } catch(e){
-        console.error("خطأ قراءة الإكسل:", e);
-        statusEl.textContent = "فشل قراءة الإكسل";
-        statusEl.className = "inactive";
-        rawExcel = [];
-      }
-    }
-
+    // محاولة تحميل تلقائي لملفات محتملة
     function tryLoadExcelCandidates(list){
-      let idx = 0;
-      function attempt(){
-        if(idx >= list.length){
-          statusEl.textContent = "لم يتم العثور على ملف تلقائيًا. استخدم رفع ملف محلي.";
+      let i = 0;
+      function next(){
+        if(i >= list.length){
+          statusEl.textContent = "لا يوجد ملف فعال. ارفع ملفًا محليًا إذا أردت.";
           statusEl.className = "inactive";
           return;
         }
-        const name = list[idx++];
+        const name = list[i++];
         fetch(name).then(res=>{
           if(!res.ok) throw new Error("not found");
           return res.arrayBuffer();
-        }).then(buff=>{
-          parseWorkbookArrayBuffer(buff, name);
-        }).catch(err=>{
-          attempt();
-        });
+        }).then(buf=>{
+          parseWorkbook(buf, name);
+        }).catch(()=> next());
       }
-      attempt();
+      next();
     }
 
-    fileInput.addEventListener('change', function(e){
-      const f = e.target.files && e.target.files[0];
+    // قراءة البافر وتحويله إلى مصفوفة صفوف
+    function parseWorkbook(arrayBuffer, sourceName){
+      try {
+        const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+        const first = wb.SheetNames[0];
+        excelData = XLSX.utils.sheet_to_json(wb.Sheets[first], { header: 1 });
+        // detect header row with text
+        if(excelData.length > 0){
+          const text = (excelData[0] || []).join(" ");
+          startIndex = (/[a-zA-Z\u0600-\u06FF]/.test(text)) ? 1 : 0;
+        } else startIndex = 0;
+        statusEl.textContent = "ملف فعال: " + (sourceName || first);
+        statusEl.className = "active";
+      } catch(err){
+        console.error(err);
+        statusEl.textContent = "فشل قراءة الإكسل";
+        statusEl.className = "inactive";
+        excelData = [];
+      }
+    }
+
+    // رفع ملف محلي
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.xlsx,.xls';
+    fileInput.style.display = 'none';
+    fileInput.addEventListener('change', (e)=>{
+      const f = e.target.files[0];
       if(!f) return;
-      const reader = new FileReader();
-      reader.onload = function(ev){ parseWorkbookArrayBuffer(ev.target.result, f.name); };
-      reader.onerror = function(){ statusEl.textContent = "فشل قراءة الملف المحلي"; statusEl.className = "inactive"; };
-      reader.readAsArrayBuffer(f);
+      const r = new FileReader();
+      r.onload = (ev)=> parseWorkbook(ev.target.result, f.name);
+      r.onerror = ()=> { statusEl.textContent = "فشل قراءة الملف المحلي"; statusEl.className = "inactive"; };
+      r.readAsArrayBuffer(f);
     });
+    document.body.appendChild(fileInput);
 
-    /**************************************************************************
-     * Helpers
-     **************************************************************************/
-    function getCell(row, idx){
-      if(!row) return "";
-      const v = row[idx];
-      if(v === undefined || v === null) return "";
-      return String(v);
-    }
-
-    function uidFromRowArray(row){
-      const qr = getCell(row, QR_IDX).toString().trim();
-      const code = getCell(row, CODE_IDX).toString().trim();
-      const name = getCell(row, NAME_IDX).toString().trim();
+    // Helpers
+    function getCell(row, idx){ if(!row) return ""; const v = row[idx]; return (v === undefined || v === null) ? "" : String(v); }
+    function uidFromRow(row){
+      const qr = getCell(row, QR_IDX).trim();
+      const code = getCell(row, CODE_IDX).trim();
+      const name = getCell(row, NAME_IDX).trim();
       if(qr) return "QR::" + qr;
       if(code) return "CODE::" + code;
       return "NAME::" + name;
     }
 
-    function findRowByValue(value){
-      if(!Array.isArray(rawExcel) || rawExcel.length <= startIndex) return null;
-      const v = String(value || "").trim();
-      if(!v) return null;
-      // QR exact
-      for(let i = startIndex; i < rawExcel.length; i++){
-        const row = rawExcel[i] || [];
-        if(getCell(row, QR_IDX).toString().trim() === v) return i;
-      }
-      // code exact
-      for(let i = startIndex; i < rawExcel.length; i++){
-        const row = rawExcel[i] || [];
-        if(getCell(row, CODE_IDX).toString().trim() === v) return i;
-      }
-      // name contains
-      for(let i = startIndex; i < rawExcel.length; i++){
-        const row = rawExcel[i] || [];
-        if(getCell(row, NAME_IDX).toString().toLowerCase().includes(v.toLowerCase())) return i;
-      }
-      return null;
-    }
-
-    /**************************************************************************
-     * Search - show rows AS-IS from rawExcel (do NOT dedupe)
-     **************************************************************************/
-    let scaleFilterActive = false;
-    function applyScaleFilterTo(tbody){
-      if(!tbody) return;
-      Array.from(tbody.rows).forEach(row=>{
-        const code = (row.cells[2] && row.cells[2].textContent) || "";
-        row.style.display = (scaleFilterActive && code.trim() === "") ? 'none' : '';
-      });
-    }
-
-    function search(fromScanner=false, val=""){
-      const q = (fromScanner ? String(val) : (searchBar.value || "")).trim().toLowerCase();
+    // البحث وعرض النتائج (dedupe per search; show warning once if duplicates in source)
+    function search(fromScanner=false, value=""){
+      const q = (fromScanner ? String(value) : (searchBar.value || "")).trim().toLowerCase();
       resultsTbody.innerHTML = "";
-      if(!Array.isArray(rawExcel) || rawExcel.length <= startIndex) { checkClearResultsVisibility(); return; }
-      if(q === "") { checkClearResultsVisibility(); return; }
+      dupWarningEl.style.display = 'none';
+      if(!Array.isArray(excelData) || excelData.length <= startIndex) { checkClearResults(); return; }
+      if(!q) { checkClearResults(); return; }
 
-      for(let i = startIndex; i < rawExcel.length; i++){
-        const row = rawExcel[i] || [];
+      const seenUids = new Set();
+      let dupFound = false;
+
+      for(let i = startIndex; i < excelData.length; i++){
+        const row = excelData[i] || [];
         if(row.length === 0) continue;
         const name = getCell(row, NAME_IDX).toLowerCase();
         const price = getCell(row, PRICE_IDX);
@@ -373,72 +381,110 @@
         const qr = getCell(row, QR_IDX).toLowerCase();
 
         if(name.includes(q) || code.includes(q) || qr.includes(q)){
-          const tr = document.createElement('tr');
+          const uid = uidFromRow(row);
+          if(seenUids.has(uid)){
+            dupFound = true;
+            continue; // display only one copy
+          }
+          seenUids.add(uid);
 
-          const tdName = document.createElement('td'); tdName.textContent = getCell(row, NAME_IDX); tr.appendChild(tdName);
-          const tdPrice = document.createElement('td'); tdPrice.textContent = price; tr.appendChild(tdPrice);
-          const tdCode = document.createElement('td'); tdCode.textContent = getCell(row, CODE_IDX); tr.appendChild(tdCode);
-          const tdQr = document.createElement('td'); tdQr.textContent = getCell(row, QR_IDX); tr.appendChild(tdQr);
+          const tr = document.createElement('tr');
+          const td0 = document.createElement('td'); td0.textContent = getCell(row, NAME_IDX); tr.appendChild(td0);
+          const td1 = document.createElement('td'); td1.textContent = price; tr.appendChild(td1);
+          const td2 = document.createElement('td'); td2.textContent = getCell(row, CODE_IDX); tr.appendChild(td2);
+          const td3 = document.createElement('td'); td3.textContent = getCell(row, QR_IDX); tr.appendChild(td3);
 
           const tdAction = document.createElement('td');
           const receiveBtn = document.createElement('button');
           receiveBtn.className = 'addBtn';
           receiveBtn.textContent = 'استلام';
-          receiveBtn.addEventListener('click', ()=> openReceiveModalFromResults(i));
+          receiveBtn.addEventListener('click', ()=> openReceiveModal(i));
           tdAction.appendChild(receiveBtn);
 
           const delBtn = document.createElement('button');
           delBtn.className = 'delBtn';
           delBtn.textContent = 'حذف';
-          delBtn.addEventListener('click', ()=> { tr.remove(); checkClearResultsVisibility(); });
+          delBtn.addEventListener('click', ()=> { tr.remove(); checkClearResults(); });
           tdAction.appendChild(delBtn);
 
           tr.appendChild(tdAction);
           tr.dataset.sourceIndex = i;
-          tr.dataset.uid = uidFromRowArray(row);
+          tr.dataset.uid = uid;
 
           resultsTbody.appendChild(tr);
         }
       }
 
-      applyScaleFilterTo(resultsTbody);
-      checkClearResultsVisibility();
+      if(dupFound){
+        dupWarningEl.textContent = "تحذير: يوجد تكرار لنفس المنتج في ملف الإكسل — تم عرض نسخة واحدة فقط.";
+        dupWarningEl.style.display = 'block';
+      } else {
+        dupWarningEl.style.display = 'none';
+      }
 
-      // If search triggered by scanner, auto-open modal for the best match (if found)
-      if(fromScanner && val){
-        const matchIndex = findRowByValue(val);
+      applyScaleFilter(resultsTbody);
+      checkClearResults();
+
+      // if triggered by scanner, auto-open modal for best match (exact QR or code preferred)
+      if(fromScanner && value){
+        const matchIndex = findRowByValue(value);
         if(matchIndex !== null){
-          const uid = uidFromRowArray(rawExcel[matchIndex]);
-          const now = Date.now();
-          if(modalOpen) return;
-          if(lastModalUid === uid && (now - lastModalTime) < MODAL_COOLDOWN) return;
-          lastModalUid = uid;
-          lastModalTime = now;
-          openReceiveModalFromResults(matchIndex);
+          // avoid reopening if modal already open
+          if(!modalOpen) openReceiveModal(matchIndex);
         }
       }
     }
 
-    function checkClearResultsVisibility(){ clearResultsBtn.style.display = (resultsTbody.rows.length === 0) ? 'none' : 'inline-block'; }
-    function clearSearch(){ searchBar.value = ""; resultsTbody.innerHTML = ""; checkClearResultsVisibility(); }
-
-    function toggleScaleFilter(){
-      scaleFilterActive = !scaleFilterActive;
-      scaleBtn.classList.toggle('active', scaleFilterActive);
-      applyScaleFilterTo(resultsTbody);
-      applyScaleFilterTo(finalTbody);
+    function findRowByValue(val){
+      if(!Array.isArray(excelData) || excelData.length <= startIndex) return null;
+      const v = String(val || "").trim();
+      if(!v) return null;
+      // exact QR
+      for(let i = startIndex; i < excelData.length; i++){
+        const row = excelData[i] || [];
+        if(getCell(row, QR_IDX).trim() === v) return i;
+      }
+      // exact code
+      for(let i = startIndex; i < excelData.length; i++){
+        const row = excelData[i] || [];
+        if(getCell(row, CODE_IDX).trim() === v) return i;
+      }
+      // name contains
+      for(let i = startIndex; i < excelData.length; i++){
+        const row = excelData[i] || [];
+        if(getCell(row, NAME_IDX).toLowerCase().includes(v.toLowerCase())) return i;
+      }
+      return null;
     }
 
-    /**************************************************************************
-     * Modal (open from results or edit from final)
-     **************************************************************************/
-    function openReceiveModalFromResults(sourceIndex){
+    function clearSearch(){ searchBar.value = ""; resultsTbody.innerHTML = ""; dupWarningEl.style.display = 'none'; checkClearResults(); }
+    function checkClearResults(){ clearResultsBtn.style.display = (resultsTbody.rows.length === 0) ? 'none' : 'inline-block'; }
+
+    // Scale filter
+    let scaleFilterActive = false;
+    function toggleScaleFilter(){
+      scaleFilterActive = !scaleFilterActive;
+      scaleBtn.classList.toggle('scale-active', scaleFilterActive);
+      applyScaleFilter(resultsTbody);
+      applyScaleFilter(finalTbody);
+    }
+    function applyScaleFilter(tbody){
+      if(!tbody) return;
+      Array.from(tbody.rows).forEach(row=>{
+        const codeCell = row.cells[2];
+        const val = codeCell ? (codeCell.textContent || "").trim() : "";
+        row.style.display = (scaleFilterActive && val === "") ? 'none' : '';
+      });
+    }
+
+    // Modal functions
+    function openReceiveModal(sourceIndex){
       modalCurrentSourceIndex = sourceIndex;
       modalEditingUid = null;
       modalOpen = true;
-      const row = rawExcel[sourceIndex] || [];
+      const row = excelData[sourceIndex] || [];
       modalName.textContent = getCell(row, NAME_IDX) || "";
-      const uid = uidFromRowArray(row);
+      const uid = uidFromRow(row);
       if(finalMap.has(uid)) modalInput.value = finalMap.get(uid).qty || ""; else modalInput.value = "";
       receiveModalOverlay.style.display = 'flex';
       setTimeout(()=> { try{ modalInput.focus(); modalInput.select && modalInput.select(); }catch(e){} }, 120);
@@ -464,7 +510,7 @@
       modalOpen = false;
     }
 
-    // numpad & caret helpers
+    // numpad interactions
     document.querySelectorAll('.numpad button[data-key]').forEach(btn=>{
       btn.addEventListener('click', ()=> {
         const k = btn.getAttribute('data-key');
@@ -472,7 +518,7 @@
         modalInput.focus();
       });
     });
-    modalBackBtn && modalBackBtn.addEventListener('click', ()=> { backspaceAtCaret(modalInput); modalInput.focus(); });
+    modalBack.addEventListener('click', ()=> { backspaceAtCaret(modalInput); modalInput.focus(); });
 
     function insertAtCaret(input, text){
       try{
@@ -501,10 +547,10 @@
       }catch(e){ input.value = (input.value || "").slice(0,-1); }
     }
 
-    // keyboard handling for modal and global
+    // Keyboard handling to allow typing numbers from physical keyboard into modalInput
     document.addEventListener('keydown', function(e){
       if(modalOpen){
-        if(e.key === 'Enter'){ e.preventDefault(); modalConfirm(); return; }
+        if(e.key === 'Enter'){ e.preventDefault(); modalConfirmHandler(); return; }
         if(e.key === 'Escape'){ e.preventDefault(); closeModal(); return; }
         if((e.key >= '0' && e.key <= '9') || e.key === '.'){
           if(document.activeElement !== modalInput){
@@ -526,14 +572,14 @@
     });
 
     modalInput.addEventListener('keydown', function(e){
-      if(e.key === 'Enter'){ e.preventDefault(); modalConfirm(); }
+      if(e.key === 'Enter'){ e.preventDefault(); modalConfirmHandler(); }
       else if(e.key === 'Escape'){ e.preventDefault(); closeModal(); }
     });
 
-    modalConfirmBtn.addEventListener('click', modalConfirm);
-    modalCancelBtn.addEventListener('click', closeModal);
+    modalCancel.addEventListener('click', closeModal);
+    modalConfirm.addEventListener('click', modalConfirmHandler);
 
-    function modalConfirm(){
+    function modalConfirmHandler(){
       const v = (modalInput.value || '').trim();
       if(v === ''){ alert('لا يمكن ترك الحقل فارغاً'); modalInput.focus(); return; }
       const num = Number(v);
@@ -556,59 +602,59 @@
         closeModal(); return;
       }
 
-      const rowArray = rawExcel[modalCurrentSourceIndex] || [];
-      addOrUpdateFinalFromRow(rowArray, v);
+      const rowArray = excelData[modalCurrentSourceIndex] || [];
+      addOrUpdateFinal(rowArray, v);
 
-      // clear search bar after successful add/update and focus it for next scan
+      // clear search bar and focus for next scan/search
       searchBar.value = "";
       try{ searchBar.focus(); }catch(e){}
-
       closeModal();
     }
 
-    /**************************************************************************
-     * Add / Update final table
-     **************************************************************************/
-    function addOrUpdateFinalFromRow(rowArray, qty){
-      const uid = uidFromRowArray(rowArray);
+    // Add/update final table
+    function addOrUpdateFinal(rowArray, qty){
+      const uid = uidFromRow(rowArray);
       if(finalMap.has(uid)){
-        const existing = finalMap.get(uid);
-        existing.qty = qty;
-        if(existing.rowEl) existing.rowEl.cells[1].textContent = qty;
+        const entry = finalMap.get(uid);
+        entry.qty = qty;
+        if(entry.rowEl) entry.rowEl.cells[1].textContent = qty;
         return 'updated';
       }
-
       const tr = document.createElement('tr');
+      const td0 = document.createElement('td'); td0.textContent = getCell(rowArray, NAME_IDX); tr.appendChild(td0);
+      const td1 = document.createElement('td'); td1.textContent = qty; tr.appendChild(td1);
+      const td2 = document.createElement('td'); td2.textContent = getCell(rowArray, CODE_IDX); tr.appendChild(td2);
+      const td3 = document.createElement('td'); td3.textContent = getCell(rowArray, QR_IDX); tr.appendChild(td3);
 
-      const tdName = document.createElement('td'); tdName.textContent = getCell(rowArray, NAME_IDX); tr.appendChild(tdName);
-      const tdQty = document.createElement('td'); tdQty.textContent = qty; tr.appendChild(tdQty);
-      const tdCode = document.createElement('td'); tdCode.textContent = getCell(rowArray, CODE_IDX); tr.appendChild(tdCode);
-      const tdQr = document.createElement('td'); tdQr.textContent = getCell(rowArray, QR_IDX); tr.appendChild(tdQr);
-
-      const tdEdit = document.createElement('td');
-      const editBtn = document.createElement('button'); editBtn.className='editBtn'; editBtn.textContent='تعديل';
+      const tdAction = document.createElement('td');
+      const editBtn = document.createElement('button');
+      editBtn.className = 'addBtn';
+      editBtn.textContent = 'تعديل';
+      editBtn.style.background = '#ffc107'; editBtn.style.color = '#111';
       editBtn.addEventListener('click', ()=> openEditFinal(uid));
-      tdEdit.appendChild(editBtn); tr.appendChild(tdEdit);
+      tdAction.appendChild(editBtn);
+      tr.appendChild(tdAction);
 
       const tdDel = document.createElement('td');
-      const delBtn = document.createElement('button'); delBtn.className='delBtn'; delBtn.textContent='حذف';
-      delBtn.addEventListener('click', ()=> { tr.remove(); finalMap.delete(uid); checkClearAllVisibility(); });
-      tdDel.appendChild(delBtn); tr.appendChild(tdDel);
+      const delBtn = document.createElement('button');
+      delBtn.className = 'delBtn';
+      delBtn.textContent = 'حذف';
+      delBtn.addEventListener('click', ()=> { tr.remove(); finalMap.delete(uid); checkClearAll(); });
+      tdDel.appendChild(delBtn);
+      tr.appendChild(tdDel);
 
       finalTbody.appendChild(tr);
       finalMap.set(uid, { rowEl: tr, qty: qty, rowArray: rowArray });
-      applyScaleFilterTo(finalTbody);
-      checkClearAllVisibility();
+      applyScaleFilter(finalTbody);
+      checkClearAll();
       return 'added';
     }
 
-    function checkClearAllVisibility(){ clearAllBtn.style.display = (finalTbody.rows.length === 0) ? 'none' : 'inline-block'; }
-    function clearAllSelected(){ finalTbody.innerHTML = ""; finalMap.clear(); checkClearAllVisibility(); }
+    function checkClearAll(){ clearAllBtnEl.style.display = (finalTbody.rows.length === 0) ? 'none' : 'inline-block'; }
+    function clearAllSelected(){ finalTbody.innerHTML = ""; finalMap.clear(); checkClearAll(); }
 
-    /**************************************************************************
-     * Export final table to Excel (neat + colored headers)
-     **************************************************************************/
-    function exportFinalToExcel(){
+    // Export final table to Excel (neat headers)
+    function exportToExcel(){
       const rows = [];
       rows.push(["اسم المنتج","كود الميزان","العدد/الوزن","QR"]);
       for(const [uid, entry] of finalMap){
@@ -624,19 +670,16 @@
 
       let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" lang="ar"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"/></head><body>';
       html += '<table border="1" style="border-collapse:collapse; font-family: Arial, sans-serif;">';
-      // header
       html += '<thead><tr>';
       rows[0].forEach((h, idx) => {
         const bg = headerColors[idx % headerColors.length];
-        html += `<th style="background:${bg}; font-weight:bold; padding:8px 12px; text-align:center;">${escapeHtml(h)}</th>`;
+        html += `<th style="background:${bg}; font-weight:bold; padding:8px 12px; text-align:center;">${h}</th>`;
       });
-      html += '</tr></thead>';
-      // body
-      html += '<tbody>';
+      html += '</tr></thead><tbody>';
       for(let i = 1; i < rows.length; i++){
         html += '<tr>';
         rows[i].forEach(cell => {
-          html += `<td style="padding:6px 10px; text-align:center;">${escapeHtml(cell)}</td>`;
+          html += `<td style="padding:6px 10px; text-align:center;">${cell}</td>`;
         });
         html += '</tr>';
       }
@@ -646,27 +689,17 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'exported_selected_products.xls';
+      a.download = 'export_selected.xls';
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     }
 
-    function escapeHtml(s){
-      if(s === undefined || s === null) return '';
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
-
-    /**************************************************************************
-     * QR Scanner: use html5-qrcode and ensure cameraIdOrConfig passed correctly
-     * - If a specific deviceId is available, pass the deviceId string
-     * - Otherwise pass an object with exactly one key: { facingMode: "environment" }
-     * Visible size is controlled by CSS; library chooses capture resolution.
-     **************************************************************************/
+    // QR Scanner (html5-qrcode)
     function chooseBackCamera(devices){
       if(!devices || devices.length === 0) return null;
-      const keywords = ["back","rear","env","environment","back camera","rear camera","الكاميرا الخلفية","خلفي","backcam","rearcam"];
+      const keywords = ["back","rear","env","environment","back camera","rear camera","الكاميرا الخلفية","خلفي"];
       for(const d of devices){
         const label = (d.label || "").toString().toLowerCase();
         for(const k of keywords) if(label.includes(k)) return d.id || d.deviceId || (d.id ?? d.deviceId);
@@ -679,115 +712,116 @@
       return first.id || first.deviceId || (first.id ?? first.deviceId);
     }
 
-    async function startScanner(){
+    async function toggleScanner(){
       if(scannerRunning){
-        try{ await html5QrCode.stop(); }catch(e){}
-        try{ html5QrCode.clear(); }catch(e){}
-        html5QrCode = null; readerDiv.innerHTML = ""; readerDiv.style.display = 'none'; scannerRunning = false; cameraBtn.textContent = '📷 الكاميرا';
-        return;
+        stopScanner();
+      } else {
+        startScanner();
       }
+    }
 
-      readerDiv.innerHTML = ""; readerDiv.style.display = 'block'; cameraBtn.textContent = '⏹ إيقاف الكاميرا';
+    async function stopScanner(){
+      if(!qrScanner) return;
+      try{ await qrScanner.stop(); }catch(e){}
+      try{ qrScanner.clear(); }catch(e){}
+      qrScanner = null;
+      reader.style.display = 'none';
+      scannerRunning = false;
+      cameraBtn.textContent = '📷 QR';
+    }
+
+    async function startScanner(){
+      reader.style.display = 'block';
+      cameraBtn.textContent = '⏹ إيقاف الماسح';
       try{
-        html5QrCode = new Html5Qrcode("reader");
+        qrScanner = new Html5Qrcode("reader");
         const devices = await Html5Qrcode.getCameras().catch(()=>[]);
-        const chosenId = chooseBackCamera(devices);
+        const chosen = chooseBackCamera(devices);
+        const cameraIdOrConfig = chosen ? chosen : { facingMode: "environment" }; // either deviceId string or single-key object
 
-        // cameraIdOrConfig must be either a string deviceId OR an object with exactly one key (e.g. { facingMode: "environment" })
-        const cameraIdOrConfig = chosenId ? chosenId : { facingMode: "environment" };
-
-        await html5QrCode.start(
+        await qrScanner.start(
           cameraIdOrConfig,
-          { fps: 10, qrbox: 250, disableFlip: false }, // config (not camera constraints)
+          { fps: 10, qrbox: 250 },
           (decodedText, decodedResult) => {
             try {
               const now = Date.now();
-              if(decodedText === lastScan.text && (now - lastScan.time) < lastScan.tolerance){
+              if(decodedText === lastScan.text && (now - lastScan.time) < lastScan.tol){
                 lastScan.time = now; return;
               }
               lastScan.text = decodedText; lastScan.time = now;
 
-              // If modal is open, ignore new scans (don't interrupt quantity input)
-              if(modalOpen) return;
+              if(modalOpen) return; // don't interrupt if modal open
 
-              // Paste value into searchBar and trigger automatic search + modal
+              // paste into search bar and auto-search -> modal opening handled by search()
               searchBar.value = decodedText;
               try{ searchBar.focus(); }catch(e){}
               search(true, decodedText);
 
             } catch(err){
-              console.error("scan callback error", err);
+              console.error('scan callback err', err);
             }
           },
-          (errorMessage) => {
-            // ignore frame scan errors
-          }
+          (errMsg) => { /* ignore frame errors */ }
         );
         scannerRunning = true;
+        cameraBtn.textContent = '⏹ إيقاف الماسح';
       }catch(err){
         alert('فشل تشغيل الكاميرا: ' + (err && err.message ? err.message : err));
-        readerDiv.innerHTML = ""; readerDiv.style.display = 'none'; scannerRunning = false; cameraBtn.textContent = '📷 الكاميرا';
+        reader.style.display = 'none';
+        scannerRunning = false;
+        cameraBtn.textContent = '📷 QR';
       }
     }
 
-    /**************************************************************************
-     * UI bindings
-     **************************************************************************/
+    // UI bindings
     searchBtn.addEventListener('click', ()=> search(false));
     clearBtn.addEventListener('click', clearSearch);
-    cameraBtn.addEventListener('click', startScanner);
+    cameraBtn.addEventListener('click', toggleScanner);
     scaleBtn.addEventListener('click', toggleScaleFilter);
-    clearResultsBtn.addEventListener('click', ()=> { resultsTbody.innerHTML = ""; checkClearResultsVisibility(); });
-    clearAllBtn.addEventListener('click', clearAllSelected);
-    exportBtn.addEventListener('click', exportFinalToExcel);
+    clearResultsBtn.addEventListener('click', ()=> { resultsTbody.innerHTML = ""; checkClearResults(); });
+    clearAllBtnEl.addEventListener('click', clearAllSelected);
+    exportBtn.addEventListener('click', exportToExcel);
 
     searchBar.addEventListener('keydown', function(e){
       if(e.key === 'Enter'){ e.preventDefault(); search(false); }
     });
 
-    // Delete to remove last final row
+    // Delete removes last final row
     document.addEventListener('keydown', function(e){
       if(e.key === 'Delete'){
         if(finalTbody.rows.length > 0){
           finalTbody.deleteRow(finalTbody.rows.length - 1);
-          rebuildFinalMapFromDom();
-          checkClearAllVisibility();
+          rebuildFinalMap();
+          checkClearAll();
         }
       }
     });
 
     receiveModalOverlay.addEventListener('click', function(e){ if(e.target === receiveModalOverlay) closeModal(); });
 
-    function rebuildFinalMapFromDom(){
+    function rebuildFinalMap(){
       finalMap.clear();
       Array.from(finalTbody.rows).forEach(r=>{
         const name = r.cells[0] ? r.cells[0].textContent : "";
         const qty = r.cells[1] ? r.cells[1].textContent : "";
         const code = r.cells[2] ? r.cells[2].textContent : "";
         const qr = r.cells[3] ? r.cells[3].textContent : "";
-        const rArr = [name, "", code, qr];
-        const uid = uidFromRowArray(rArr);
-        finalMap.set(uid, { rowEl: r, qty: qty, rowArray: rArr });
+        const arr = [name, "", code, qr];
+        const uid = uidFromRow(arr);
+        finalMap.set(uid, { rowEl: r, qty: qty, rowArray: arr });
       });
     }
 
-    const observerFinal = new MutationObserver(()=> applyScaleFilterTo(finalTbody));
-    observerFinal.observe(finalTbody, { childList:true, subtree:true });
-
-    /**************************************************************************
-     * Startup
-     **************************************************************************/
+    // Load candidates on startup
     window.addEventListener('load', function(){
       tryLoadExcelCandidates(excelCandidates);
       setTimeout(()=>{ try{ searchBar.focus(); }catch(e){} }, 200);
-      checkClearAllVisibility(); checkClearResultsVisibility();
+      checkClearAll();
+      checkClearResults();
     });
 
-    /**************************************************************************
-     * Utilities
-     **************************************************************************/
-    function checkClearAllVisibility(){ clearAllBtn.style.display = (finalTbody.rows.length === 0) ? 'none' : 'inline-block'; }
-    function checkClearResultsVisibility(){ clearResultsBtn.style.display = (resultsTbody.rows.length === 0) ? 'none' : 'inline-block'; }
+    // Provide a simple way to upload file (double-click the status to upload)
+    statusEl.addEventListener('dblclick', ()=> fileInput.click());
 
   </script>
 </body>
