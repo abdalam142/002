@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=1200" />
-  <title>بحث واستلام منتجات من ملف Excel</title>
+  <title>نظام بحث واستلام المنتجات (Excel + QR)</title>
 
   <!-- مكتبات -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -13,6 +13,7 @@
     :root{
       --bg:#f6f7fb; --card:#fff; --muted:#6c757d;
       --primary:#0d6efd; --danger:#dc3545; --success:#198754;
+      --header-fill:#cfe2ff;
     }
     html,body{height:100%; margin:0; background:var(--bg); font-family:Arial, sans-serif; direction:rtl}
     .wrap{max-width:1200px; margin:18px auto; padding:16px;}
@@ -29,7 +30,7 @@
     .columns{display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;}
     .table-wrapper{max-height:60vh; overflow:auto; border-radius:6px; background:var(--card); padding:6px}
     table{width:100%; border-collapse:collapse; table-layout:fixed; word-wrap:break-word}
-    thead th{background:#f2f2f2; padding:8px; border:1px solid #e0e0e0; font-weight:700}
+    thead th{background:var(--header-fill); padding:8px; border:1px solid #e0e0e0; font-weight:700}
     tbody td{padding:8px; border:1px solid #e6e6e6; text-align:center; vertical-align:middle}
     .addBtn{background:var(--success); color:#fff; border:none; padding:6px 10px; border-radius:6px}
     .delBtn{background:var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:6px}
@@ -83,7 +84,7 @@
           <div><button id="clearResultsBtn" class="small ghost" style="display:none">حذف الكل</button></div>
         </div>
 
-        <div id="reader"></div>
+        <div id="reader" aria-hidden="true"></div>
 
         <div class="table-wrapper">
           <table id="resultsTable" aria-live="polite">
@@ -116,9 +117,9 @@
             <thead>
               <tr>
                 <th>اسم المنتج</th>
-                <th>كود الميزان</th>
+                <th>السعر</th>
                 <th>العدد/الوزن</th>
-                <th>QR Code</th>
+                <th>الكود (QR / كود الميزان)</th>
                 <th>تعديل</th>
                 <th>حذف</th>
               </tr>
@@ -139,24 +140,25 @@
     <div class="modal" role="document" aria-labelledby="modalTitle">
       <h4 id="modalTitle">استلام المنتج</h4>
       <div id="modalName" style="text-align:center; font-weight:700; margin-bottom:8px"></div>
-      <input id="modalInput" class="modal-input" inputmode="decimal" placeholder="العدد أو الوزن (مثال: 2 أو 0.5)">
+      <!-- استخدام input text مع inputmode=decimal ليقبل الكيبورد الفعلي -->
+      <input id="modalInput" class="modal-input" inputmode="decimal" placeholder="العدد أو الوزن (مثال: 2 أو 0.5)" autocomplete="off" />
       <div class="numpad" aria-hidden="false">
-        <button onclick="modalKey('7')">7</button>
-        <button onclick="modalKey('8')">8</button>
-        <button onclick="modalKey('9')">9</button>
-        <button onclick="modalKey('4')">4</button>
-        <button onclick="modalKey('5')">5</button>
-        <button onclick="modalKey('6')">6</button>
-        <button onclick="modalKey('1')">1</button>
-        <button onclick="modalKey('2')">2</button>
-        <button onclick="modalKey('3')">3</button>
-        <button onclick="modalBack()">⌫</button>
-        <button onclick="modalKey('0')">0</button>
-        <button onclick="modalKey('.')">.</button>
+        <button type="button" data-key="7">7</button>
+        <button type="button" data-key="8">8</button>
+        <button type="button" data-key="9">9</button>
+        <button type="button" data-key="4">4</button>
+        <button type="button" data-key="5">5</button>
+        <button type="button" data-key="6">6</button>
+        <button type="button" data-key="1">1</button>
+        <button type="button" data-key="2">2</button>
+        <button type="button" data-key="3">3</button>
+        <button type="button" id="modalBack">⌫</button>
+        <button type="button" data-key="0">0</button>
+        <button type="button" data-key=".">.</button>
       </div>
       <div class="actions">
-        <button class="btn ghost" onclick="closeModal()">إلغاء</button>
-        <button class="btn primary" onclick="confirmModal()">تم</button>
+        <button class="btn ghost" id="modalCancel">إلغاء</button>
+        <button class="btn primary" id="modalConfirm">تم</button>
       </div>
     </div>
   </div>
@@ -198,6 +200,9 @@
     const receiveModalOverlay = document.getElementById('receiveModal');
     const modalInput = document.getElementById('modalInput');
     const modalName = document.getElementById('modalName');
+    const modalBackBtn = document.getElementById('modalBack');
+    const modalCancelBtn = document.getElementById('modalCancel');
+    const modalConfirmBtn = document.getElementById('modalConfirm');
 
     // خريطة النهائي لمنع التكرار: uid -> { rowEl, qty, rowArray }
     const finalMap = new Map();
@@ -213,7 +218,7 @@
     let modalOpen = false;
     let lastModalUid = null;
     let lastModalTime = 0;
-    const MODAL_COOLDOWN = 800; // ms
+    const MODAL_COOLDOWN = 600; // ms
 
     // duplicate source detection
     let duplicatesInSource = false;
@@ -328,7 +333,6 @@
       }
 
       if(duplicatesInSource && !shownDuplicateAlert){
-        // نعرض تنبيه مرة واحدة عند أول بحث بعد التحميل لو فيه مكررات
         alert("تحذير: يوجد سجلات مكررة في ملف الإكسل. سيتم عرض نسخة واحدة فقط لكل منتج في نتائج البحث.");
         shownDuplicateAlert = true;
       }
@@ -390,7 +394,7 @@
     }
 
     /**************************************************************************
-     * إيجاد صف مطابقة لقيمة (QR exact -> code exact -> name contains)
+     * إيجاد صف مطابق بالقيمة (QR exact -> code exact -> name contains)
      **************************************************************************/
     function findRowByValue(value){
       if(!Array.isArray(rawExcel) || rawExcel.length <= startIndex) return null;
@@ -451,12 +455,65 @@
       lastModalTime = Date.now();
     }
 
-    function modalKey(ch){
-      if(ch === '.' && (modalInput.value||'').includes('.')) return;
-      modalInput.value = (modalInput.value || '') + ch;
+    // numpad buttons interaction + allow keyboard typing
+    document.querySelectorAll('.numpad button[data-key]').forEach(btn=>{
+      btn.addEventListener('click', ()=> {
+        const k = btn.getAttribute('data-key');
+        // insert at caret
+        insertAtCaret(modalInput, k);
+        modalInput.focus();
+      });
+    });
+    modalBackBtn && modalBackBtn.addEventListener('click', ()=>{
+      // backspace at caret
+      backspaceAtCaret(modalInput);
       modalInput.focus();
+    });
+
+    // helper to insert at caret position
+    function insertAtCaret(input, text){
+      try{
+        const start = input.selectionStart || 0;
+        const end = input.selectionEnd || 0;
+        const val = input.value || "";
+        input.value = val.slice(0,start) + text + val.slice(end);
+        const pos = start + text.length;
+        input.setSelectionRange(pos,pos);
+      }catch(e){
+        input.value = (input.value || "") + text;
+      }
     }
-    function modalBack(){ modalInput.value = (modalInput.value || '').slice(0,-1); modalInput.focus(); }
+    function backspaceAtCaret(input){
+      try{
+        const start = input.selectionStart || 0;
+        const end = input.selectionEnd || 0;
+        if(start === end && start > 0){
+          const val = input.value || "";
+          input.value = val.slice(0, start-1) + val.slice(end);
+          const pos = start-1;
+          input.setSelectionRange(pos,pos);
+        } else {
+          // if selection, remove selection
+          const val = input.value || "";
+          input.value = val.slice(0,start) + val.slice(end);
+          input.setSelectionRange(start,start);
+        }
+      }catch(e){
+        input.value = (input.value || "").slice(0,-1);
+      }
+    }
+
+    // allow device keyboard typing naturally; no extra handlers needed,
+    // but ensure Enter on modal triggers confirm:
+    modalInput.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        modalConfirmBtn.click();
+      } else if(e.key === 'Escape'){
+        e.preventDefault();
+        closeModal();
+      }
+    });
 
     function confirmModal(){
       const v = (modalInput.value || '').trim();
@@ -470,7 +527,7 @@
           entry.qty = v;
           entry.rowEl.cells[2].textContent = v;
         }
-        // فراغ search bar
+        // empty search bar
         searchBar.value = "";
         closeModal();
         return;
@@ -484,7 +541,7 @@
       const rowArray = rawExcel[modalCurrentSourceIndex] || [];
       addOrUpdateFinalFromRow(rowArray, v);
 
-      // حدّث خلية العدد في نتائج البحث إن وُجد صف لهذا المصدر
+      // Update results row qty if visible
       Array.from(resultsTbody.rows).forEach(r=>{
         if(r.dataset && r.dataset.sourceIndex){
           if(Number(r.dataset.sourceIndex) === modalCurrentSourceIndex){
@@ -493,11 +550,15 @@
         }
       });
 
-      // تفريغ شريط البحث
+      // clear search bar after adding
       searchBar.value = "";
 
       closeModal();
     }
+
+    // wire modal confirm/cancel buttons to same handlers
+    modalConfirmBtn.addEventListener('click', confirmModal);
+    modalCancelBtn.addEventListener('click', closeModal);
 
     /**************************************************************************
      * إضافة/تحديث في جدول final مع منع التكرار حسب UID
@@ -512,9 +573,9 @@
       }
       const tr = document.createElement('tr');
       const tdName = document.createElement('td'); tdName.textContent = getCell(rowArray, NAME_IDX); tr.appendChild(tdName);
-      const tdCode = document.createElement('td'); tdCode.textContent = getCell(rowArray, CODE_IDX); tr.appendChild(tdCode);
+      const tdPrice = document.createElement('td'); tdPrice.textContent = getCell(rowArray, PRICE_IDX); tr.appendChild(tdPrice);
       const tdQty = document.createElement('td'); tdQty.textContent = qty; tr.appendChild(tdQty);
-      const tdQr = document.createElement('td'); tdQr.textContent = getCell(rowArray, QR_IDX); tr.appendChild(tdQr);
+      const tdCode = document.createElement('td'); tdCode.textContent = (getCell(rowArray, QR_IDX) || getCell(rowArray, CODE_IDX)); tr.appendChild(tdCode);
 
       const tdEdit = document.createElement('td');
       const editBtn = document.createElement('button'); editBtn.className='editBtn'; editBtn.textContent='تعديل';
@@ -538,10 +599,11 @@
     function clearTable(id){ const el = document.getElementById(id); if(!el) return; el.querySelector('tbody').innerHTML=""; if(id==='finalTable') finalMap.clear(); checkClearAllVisibility(); checkClearResultsVisibility(); }
 
     /**************************************************************************
-     * تصدير final -> إكسل (اسم، كود الميزان، العدد/الوزن، QR)
+     * تصدير final -> إكسل مرتب ومُلوّن الرؤوس
+     * نولد ورقة منظمة: اسم المنتج | السعر | العدد/الوزن | الكود
      **************************************************************************/
     function exportFinalToExcel(){
-      const aoa = [["اسم المنتج","كود الميزان","العدد/الوزن","QR Code"]];
+      const aoa = [["اسم المنتج","السعر","العدد/الوزن","الكود"]];
       Array.from(finalTbody.rows).forEach(r=>{
         aoa.push([
           r.cells[0] ? r.cells[0].textContent : "",
@@ -552,7 +614,23 @@
       });
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      // تعيين عرض أعمدة لجعل الإكسل مقروءاً
+      ws['!cols'] = [{wpx:220},{wpx:90},{wpx:110},{wpx:160}];
+
+      // محاولة وضع style للرؤوس (قد تكون محدودة اعتماداً على مكتبة الشيتس الموجودة)
+      const headerCells = ['A1','B1','C1','D1'];
+      headerCells.forEach(h=>{
+        if(!ws[h]) return;
+        ws[h].s = {
+          fill: { fgColor: { rgb: "FFD9EFFF" } },
+          font: { bold: true, color: { rgb: "FF000000" } },
+          alignment: { horizontal: "center", vertical: "center" }
+        };
+      });
+
       XLSX.utils.book_append_sheet(wb, ws, "المنتجات");
+      // writeFile (هذا سيحفظ الملف؛ في بعض بيئات المتصفح قد تكون خصائص النمط غير مدعومة)
       XLSX.writeFile(wb, "exported_products.xlsx");
     }
 
@@ -577,7 +655,7 @@
 
     async function startScanner(){
       if(scannerRunning){
-        // stop scanner
+        // stop scanner when user presses camera button again
         try{ await html5QrCode.stop(); }catch(e){}
         try{ html5QrCode.clear(); }catch(e){}
         html5QrCode = null; readerDiv.innerHTML = ""; scannerRunning = false; cameraBtn.textContent = '📷 الكاميرا';
@@ -602,7 +680,7 @@
               }
               lastScan.text = decodedText; lastScan.time = now;
 
-              // نضع القيمة في شريط البحث (حسب طلبك)
+              // نضع القيمة في شريط البحث
               searchBar.value = decodedText;
               try{ searchBar.focus(); }catch(e){}
 
@@ -632,7 +710,7 @@
             }
           },
           (errorMessage) => {
-            // تجاهل أخطاء التتبع المؤقتة
+            // تجاهل أخطاء الفريم
           }
         );
         scannerRunning = true;
@@ -664,12 +742,14 @@
       finalMap.clear();
       Array.from(finalTbody.rows).forEach(r=>{
         const name = r.cells[0] ? r.cells[0].textContent : "";
-        const code = r.cells[1] ? r.cells[1].textContent : "";
+        const price = r.cells[1] ? r.cells[1].textContent : "";
         const qty = r.cells[2] ? r.cells[2].textContent : "";
-        const qr = r.cells[3] ? r.cells[3].textContent : "";
-        const rowArray = [name, '', code, qr];
-        const uid = uidFromRowArray(rowArray);
-        finalMap.set(uid, { rowEl: r, qty: qty, rowArray: rowArray });
+        const code = r.cells[3] ? r.cells[3].textContent : "";
+        const rowArray = [name, price, code, ""]; // note: for uidFromRowArray we'll treat 3 as qr if needed
+        // build a rowArray that matches parsing expectation (name, price, code, qr)
+        const rArr = [name, price, code, code]; // best-effort to generate uid
+        const uid = uidFromRowArray(rArr);
+        finalMap.set(uid, { rowEl: r, qty: qty, rowArray: rArr });
       });
     }
 
