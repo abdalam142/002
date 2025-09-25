@@ -2,11 +2,10 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <!-- Force desktop layout on mobile as requested -->
   <meta name="viewport" content="width=1200" />
   <title>نظام بحث واستلام المنتجات (Excel + QR)</title>
 
-  <!-- Libraries -->
+  <!-- مكتبات -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>
 
@@ -19,9 +18,9 @@
       --danger:#dc3545;
       --success:#198754;
 
-      /* Camera display size (CSS only). Change these to affect on-page size without changing camera capture resolution */
-      --camera-width: 360px;
-      --camera-height: 240px;
+      /* عرض الكاميرا الظاهري في الصفحة (CSS only). غير هذه القيم لتغيير العرض دون إضعاف دقة الكاميرا */
+      --camera-width: 300px;
+      --camera-height: 200px;
     }
 
     html,body{height:100%; margin:0; background:var(--bg); font-family:Arial, sans-serif; direction:rtl}
@@ -32,7 +31,7 @@
     input[type="text"]{padding:10px 12px; border-radius:8px; border:1px solid #ddd; width:420px; font-size:15px}
     .btn{padding:9px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600}
     .primary{background:var(--primary); color:#fff}
-    .ghost{background:#e9ecef}
+    .ghost{background:#e9ecef'}
     .small{padding:6px 8px; border-radius:6px; cursor:pointer}
     .col{background:var(--card); padding:12px; border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.05); box-sizing:border-box}
     .col.half{flex: 0 0 48%;}
@@ -47,7 +46,7 @@
     #status{position:fixed; top:12px; right:12px; padding:8px 12px; border-radius:8px; color:#fff; font-weight:700; z-index:60}
     #status.inactive{background:var(--danger)} #status.active{background:var(--success)}
 
-    /* Camera container size (CSS only). This controls visible size on the page without downgrading camera capture resolution */
+    /* حاوية الكاميرا - تحكم بالعرض الظاهر فقط */
     #reader {
       width: var(--camera-width);
       height: var(--camera-height);
@@ -57,8 +56,9 @@
       overflow: hidden;
       background: #000;
       box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      margin-bottom:8px;
     }
-    /* The html5-qrcode library injects video/canvas elements; force their visible size to match container */
+    /* html5-qrcode يحقن video/canvas - نجبرهم على مطابقة الحجم المرئي */
     #reader video, #reader canvas {
       width: var(--camera-width) !important;
       height: var(--camera-height) !important;
@@ -68,11 +68,11 @@
 
     @media (max-width:900px){
       .col.half{flex: 0 0 100%}
-      #reader{ width: calc(var(--camera-width) - 40px); } /* slight shrink on small screens */
+      #reader{ width: calc(var(--camera-width) - 40px); } /* تقلل قليلاً على الشاشات الصغيرة */
       .controls{flex-direction:column; align-items:flex-start}
     }
 
-    /* Modal */
+    /* مودال */
     .modal-overlay{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:999}
     .modal{background:#fff; border-radius:10px; padding:14px; width:420px; max-width:95%; box-sizing:border-box;}
     .modal h4{margin:0 0 8px}
@@ -105,7 +105,7 @@
     <div style="margin-bottom:10px;">
       <label for="fileInput">رفع ملف إكسل محلي (إذا لم يُقرأ تلقائياً): </label>
       <input id="fileInput" type="file" accept=".xlsx,.xls" />
-      <span class="note">ترتيب الأعمدة بالإكسل: اسم - سعر - كود الميزان - QR. الصفحة تعرض الملف كما هو (لا تغيّر المصدر).</span>
+      <span class="note">ترتيب الأعمدة بالإكسل: اسم - سعر - كود الميزان - QR. الصفحة تعرض الملف كما هو.</span>
     </div>
 
     <div class="columns">
@@ -163,7 +163,7 @@
     </div>
 
     <div style="margin-top:14px; color:var(--muted); font-size:14px">
-      ملاحظة: الصفحة لا تعدّل ملف الإكسل الأصلي؛ تعرضه كما هو. تصدير "المنتجات المختارة" سيكون مُنسّقًا.
+      ملاحظة: الصفحة لا تعدّل ملف الإكسل الأصلي؛ تعرضه كما هو. التصدير من "المنتجات المختارة" سيكون مُنسّقًا.
     </div>
   </div>
 
@@ -235,7 +235,7 @@
     const modalCancelBtn = document.getElementById('modalCancel');
     const modalConfirmBtn = document.getElementById('modalConfirm');
 
-    // map to prevent duplicates in final table: UID -> { rowEl, qty, rowArray }
+    // finalMap to prevent duplicates in final table: UID -> { rowEl, qty, rowArray }
     const finalMap = new Map();
 
     // scanner state
@@ -349,6 +349,15 @@
     /**************************************************************************
      * Search - show rows AS-IS from rawExcel (do NOT dedupe)
      **************************************************************************/
+    let scaleFilterActive = false;
+    function applyScaleFilterTo(tbody){
+      if(!tbody) return;
+      Array.from(tbody.rows).forEach(row=>{
+        const code = (row.cells[2] && row.cells[2].textContent) || "";
+        row.style.display = (scaleFilterActive && code.trim() === "") ? 'none' : '';
+      });
+    }
+
     function search(fromScanner=false, val=""){
       const q = (fromScanner ? String(val) : (searchBar.value || "")).trim().toLowerCase();
       resultsTbody.innerHTML = "";
@@ -395,7 +404,7 @@
       applyScaleFilterTo(resultsTbody);
       checkClearResultsVisibility();
 
-      // If search was triggered by scanner, open modal automatically for best match (if found)
+      // If search triggered by scanner, auto-open modal for the best match (if found)
       if(fromScanner && val){
         const matchIndex = findRowByValue(val);
         if(matchIndex !== null){
@@ -420,17 +429,8 @@
       applyScaleFilterTo(finalTbody);
     }
 
-    let scaleFilterActive = false;
-    function applyScaleFilterTo(tbody){
-      if(!tbody) return;
-      Array.from(tbody.rows).forEach(row=>{
-        const code = (row.cells[2] && row.cells[2].textContent) || "";
-        row.style.display = (scaleFilterActive && code.trim() === "") ? 'none' : '';
-      });
-    }
-
     /**************************************************************************
-     * Modal: فتح من نتائج البحث أو تعديل من final
+     * Modal (open from results or edit from final)
      **************************************************************************/
     function openReceiveModalFromResults(sourceIndex){
       modalCurrentSourceIndex = sourceIndex;
@@ -464,7 +464,7 @@
       modalOpen = false;
     }
 
-    // numpad interaction + caret helpers
+    // numpad & caret helpers
     document.querySelectorAll('.numpad button[data-key]').forEach(btn=>{
       btn.addEventListener('click', ()=> {
         const k = btn.getAttribute('data-key');
@@ -559,7 +559,7 @@
       const rowArray = rawExcel[modalCurrentSourceIndex] || [];
       addOrUpdateFinalFromRow(rowArray, v);
 
-      // clear search bar after successful add/update and focus it
+      // clear search bar after successful add/update and focus it for next scan
       searchBar.value = "";
       try{ searchBar.focus(); }catch(e){}
 
@@ -607,7 +607,6 @@
 
     /**************************************************************************
      * Export final table to Excel (neat + colored headers)
-     * Columns: اسم المنتج | كود الميزان | العدد/الوزن | QR
      **************************************************************************/
     function exportFinalToExcel(){
       const rows = [];
@@ -660,9 +659,10 @@
     }
 
     /**************************************************************************
-     * QR Scanner: uses html5-qrcode, requests high capture resolution (ideal),
-     * but the visible size is controlled by CSS (#reader). Camera stays running
-     * until user toggles camera button.
+     * QR Scanner: use html5-qrcode and ensure cameraIdOrConfig passed correctly
+     * - If a specific deviceId is available, pass the deviceId string
+     * - Otherwise pass an object with exactly one key: { facingMode: "environment" }
+     * Visible size is controlled by CSS; library chooses capture resolution.
      **************************************************************************/
     function chooseBackCamera(devices){
       if(!devices || devices.length === 0) return null;
@@ -687,21 +687,18 @@
         return;
       }
 
-      // show reader container (CSS controls its visible size)
       readerDiv.innerHTML = ""; readerDiv.style.display = 'block'; cameraBtn.textContent = '⏹ إيقاف الكاميرا';
       try{
         html5QrCode = new Html5Qrcode("reader");
         const devices = await Html5Qrcode.getCameras().catch(()=>[]);
         const chosenId = chooseBackCamera(devices);
 
-        // prefer high capture resolution (doesn't affect visible size)
-        const cameraConfig = chosenId
-          ? { deviceId: { exact: chosenId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-          : { facingMode: { exact: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } };
+        // cameraIdOrConfig must be either a string deviceId OR an object with exactly one key (e.g. { facingMode: "environment" })
+        const cameraIdOrConfig = chosenId ? chosenId : { facingMode: "environment" };
 
         await html5QrCode.start(
-          cameraConfig,
-          { fps: 10, qrbox: 250, disableFlip: false },
+          cameraIdOrConfig,
+          { fps: 10, qrbox: 250, disableFlip: false }, // config (not camera constraints)
           (decodedText, decodedResult) => {
             try {
               const now = Date.now();
@@ -710,10 +707,10 @@
               }
               lastScan.text = decodedText; lastScan.time = now;
 
-              // If modal is open, ignore new scans (we don't want to interrupt the qty input)
+              // If modal is open, ignore new scans (don't interrupt quantity input)
               if(modalOpen) return;
 
-              // Paste value into searchBar, trigger automatic search and modal opening
+              // Paste value into searchBar and trigger automatic search + modal
               searchBar.value = decodedText;
               try{ searchBar.focus(); }catch(e){}
               search(true, decodedText);
@@ -723,7 +720,7 @@
             }
           },
           (errorMessage) => {
-            // frame scan errors are ignored (normal)
+            // ignore frame scan errors
           }
         );
         scannerRunning = true;
@@ -734,7 +731,7 @@
     }
 
     /**************************************************************************
-     * UI events binding
+     * UI bindings
      **************************************************************************/
     searchBtn.addEventListener('click', ()=> search(false));
     clearBtn.addEventListener('click', clearSearch);
@@ -748,7 +745,7 @@
       if(e.key === 'Enter'){ e.preventDefault(); search(false); }
     });
 
-    // keyboard Delete to remove last final row
+    // Delete to remove last final row
     document.addEventListener('keydown', function(e){
       if(e.key === 'Delete'){
         if(finalTbody.rows.length > 0){
@@ -778,30 +775,13 @@
     observerFinal.observe(finalTbody, { childList:true, subtree:true });
 
     /**************************************************************************
-     * Startup: try to load candidate Excel files automatically
+     * Startup
      **************************************************************************/
     window.addEventListener('load', function(){
       tryLoadExcelCandidates(excelCandidates);
       setTimeout(()=>{ try{ searchBar.focus(); }catch(e){} }, 200);
       checkClearAllVisibility(); checkClearResultsVisibility();
     });
-
-    function tryLoadExcelCandidates(list){
-      let idx = 0;
-      function attempt(){
-        if(idx >= list.length){
-          statusEl.textContent = "لم يتم العثور على ملف تلقائيًا. استخدم رفع ملف محلي.";
-          statusEl.className = "inactive";
-          return;
-        }
-        const name = list[idx++];
-        fetch(name).then(res=>{
-          if(!res.ok) throw new Error("not found");
-          return res.arrayBuffer();
-        }).then(buff=> parseWorkbookArrayBuffer(buff, name)).catch(err=>{ attempt(); });
-      }
-      attempt();
-    }
 
     /**************************************************************************
      * Utilities
