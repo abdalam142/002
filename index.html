@@ -73,6 +73,716 @@
     <div style="margin-bottom:10px;">
       <label for="fileInput">رفع ملف إكسل محلي (إذا لم يُقرأ تلقائياً): </label>
       <input id="fileInput" type="file" accept=".xlsx,.xls" />
+      <span class="note">الترتيب داخل الإكسل يجب أن يكون: اسم - سعر - كود الميزان - QR (لكن الصفحة لا تغيّر الملف الأصلي)</span>
+    </div>
+
+    <div class="columns">
+      <!-- نتائج البحث -->
+      <div class="col half" aria-label="نتائج البحث">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h3 style="margin:0">نتائج البحث</h3>
+          <div><button id="clearResultsBtn" class="small ghost" style="display:none">حذف الكل</button></div>
+        </div>
+
+        <div id="reader" aria-hidden="true"></div>
+
+        <div class="table-wrapper">
+          <table id="resultsTable" aria-live="polite">
+            <thead>
+              <tr>
+                <th>اسم المنتج</th>
+                <th>كود الميزان</th>
+                <th>العدد/الوزن</th>
+                <th>QR Code</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- المنتجات المختارة -->
+      <div class="col half" aria-label="المنتجات المختارة">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h3 style="margin:0">المنتجات المختارة</h3>
+          <div>
+            <button id="clearAllBtn" class="small ghost" style="display:none">حذف الكل</button>
+            <button id="exportBtn" class="small primary">تصدير إكسل</button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="finalTable" aria-live="polite">
+            <thead>
+              <tr>
+                <th>اسم المنتج</th>
+                <th>السعر</th>
+                <th>العدد/الوزن</th>
+                <th>كود الميزان</th>
+                <th>QR</th>
+                <th>تعديل</th>
+                <th>حذف</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px; color:var(--muted); font-size:14px">
+      ملاحظة: الصفحة لا تغيّر ملف الإكسل الأصلي — تعرضه كما هو. ملف الإكسل الذي يتم تصديره من "المنتجات المختارة" سيكون مُنسّقًا.
+    </div>
+  </div>
+
+  <!-- مودال الاستلام -->
+  <div class="modal-overlay" id="receiveModal" role="dialog" aria-modal="true">
+    <div class="modal" role="document" aria-labelledby="modalTitle">
+      <h4 id="modalTitle">استلام المنتج</h4>
+      <div id="modalName" style="text-align:center; font-weight:700; margin-bottom:8px"></div>
+      <input id="modalInput" class="modal-input" inputmode="decimal" placeholder="العدد أو الوزن (مثال: 2 أو 0.5)" autocomplete="off" />
+      <div class="numpad" aria-hidden="false">
+        <button type="button" data-key="7">7</button>
+        <button type="button" data-key="8">8</button>
+        <button type="button" data-key="9">9</button>
+        <button type="button" data-key="4">4</button>
+        <button type="button" data-key="5">5</button>
+        <button type="button" data-key="6">6</button>
+        <button type="button" data-key="1">1</button>
+        <button type="button" data-key="2">2</button>
+        <button type="button" data-key="3">3</button>
+        <button type="button" id="modalBack">⌫</button>
+        <button type="button" data-key="0">0</button>
+        <button type="button" data-key=".">.</button>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="modalCancel">إلغاء</button>
+        <button class="btn primary" id="modalConfirm">تم</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**************************************************************************
+     * إعدادات عامة
+     * ترتيب الأعمدة في الإكسل الوارد: [0]=اسم, [1]=سعر, [2]=كود الميزان, [3]=QR
+     **************************************************************************/
+    const excelCandidates = [
+      "products.xlsx",
+      "product.template(176).xlsx",
+      "product.xlsx",
+      "products.xls",
+      "data.xlsx",
+      "عندك.xlsx",
+      "عندك.xls"
+    ];
+
+    let rawExcel = [];         // مصفوفة الصفوف كما جاءت من الملف (لن نعدّلها)
+    let startIndex = 1;        // نفترض وجود رأس (إذا لم يوجد سيتم اكتشافه)
+    const NAME_IDX = 0, PRICE_IDX = 1, CODE_IDX = 2, QR_IDX = 3;
+
+    // DOM
+    const statusEl = document.getElementById('status');
+    const fileInput = document.getElementById('fileInput');
+    const searchBar = document.getElementById('searchBar');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const cameraBtn = document.getElementById('cameraBtn');
+    const scaleBtn = document.getElementById('scaleBtn');
+    const resultsTbody = document.querySelector('#resultsTable tbody');
+    const finalTbody = document.querySelector('#finalTable tbody');
+    const clearResultsBtn = document.getElementById('clearResultsBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const readerDiv = document.getElementById('reader');
+
+    const receiveModalOverlay = document.getElementById('receiveModal');
+    const modalInput = document.getElementById('modalInput');
+    const modalName = document.getElementById('modalName');
+    const modalBackBtn = document.getElementById('modalBack');
+    const modalCancelBtn = document.getElementById('modalCancel');
+    const modalConfirmBtn = document.getElementById('modalConfirm');
+
+    // Final map to prevent duplicates: UID -> { rowEl, qty, rowArray }
+    const finalMap = new Map();
+
+    // Scanner state
+    let html5QrCode = null;
+    let scannerRunning = false;
+    let lastScan = { text: null, time: 0, tolerance: 800 };
+
+    // Modal state
+    let modalCurrentSourceIndex = null;
+    let modalEditingUid = null;
+    let modalOpen = false;
+    let lastModalUid = null;
+    let lastModalTime = 0;
+    const MODAL_COOLDOWN = 600;
+
+    // Duplicate detection in source (we will NOT modify source; only indicate)
+    let duplicatesInSource = false;
+
+    /**************************************************************************
+     * قراءة ملف الإكسل (محلي أو تلقائي من أسماء محتملة)
+     **************************************************************************/
+    function parseWorkbookArrayBuffer(buff, sourceName){
+      try {
+        const wb = XLSX.read(new Uint8Array(buff), { type: 'array' });
+        const firstSheet = wb.SheetNames[0];
+        rawExcel = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1 });
+        // اكتشاف إذا في رأس نصي
+        if(rawExcel.length > 0){
+          const firstRowText = (rawExcel[0] || []).join(" ").toString();
+          if(/[a-zA-Z\u0600-\u06FF]/.test(firstRowText)) startIndex = 1; else startIndex = 0;
+        } else startIndex = 0;
+
+        statusEl.textContent = "ملف الإكسل متصل: " + (sourceName || firstSheet);
+        statusEl.className = "active";
+
+        detectDuplicatesInSource();
+        console.debug("Excel loaded:", { rows: rawExcel.length, startIndex });
+      } catch(e){
+        console.error("خطأ قراءة الإكسل:", e);
+        statusEl.textContent = "فشل قراءة الإكسل";
+        statusEl.className = "inactive";
+        rawExcel = [];
+      }
+    }
+
+    function tryLoadExcelCandidates(list){
+      let idx = 0;
+      function attempt(){
+        if(idx >= list.length){
+          statusEl.textContent = "لم يتم العثور على ملف تلقائيًا. استخدم رفع ملف محلي.";
+          statusEl.className = "inactive";
+          return;
+        }
+        const name = list[idx++];
+        fetch(name).then(res=>{
+          if(!res.ok) throw new Error("not found");
+          return res.arrayBuffer();
+        }).then(buff=>{
+          parseWorkbookArrayBuffer(buff, name);
+        }).catch(err=>{
+          attempt();
+        });
+      }
+      attempt();
+    }
+
+    fileInput.addEventListener('change', function(e){
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      const reader = new FileReader();
+      reader.onload = function(ev){ parseWorkbookArrayBuffer(ev.target.result, f.name); };
+      reader.onerror = function(){ statusEl.textContent = "فشل قراءة الملف المحلي"; statusEl.className = "inactive"; };
+      reader.readAsArrayBuffer(f);
+    });
+
+    /**************************************************************************
+     * مساعدة: الحصول على قيمة خلية ضمن صف
+     **************************************************************************/
+    function getCell(row, idx){
+      if(!row) return "";
+      const v = row[idx];
+      if(v === undefined || v === null) return "";
+      return String(v);
+    }
+
+    function uidFromRowArray(row){
+      const qr = getCell(row, QR_IDX).toString().trim();
+      const code = getCell(row, CODE_IDX).toString().trim();
+      const name = getCell(row, NAME_IDX).toString().trim();
+      if(qr) return "QR::" + qr;
+      if(code) return "CODE::" + code;
+      return "NAME::" + name;
+    }
+
+    function detectDuplicatesInSource(){
+      duplicatesInSource = false;
+      if(!Array.isArray(rawExcel) || rawExcel.length <= startIndex) return;
+      const seen = new Set();
+      for(let i = startIndex; i < rawExcel.length; i++){
+        const row = rawExcel[i] || [];
+        if(row.length === 0) continue;
+        const uid = uidFromRowArray(row);
+        if(seen.has(uid)){ duplicatesInSource = true; break; }
+        seen.add(uid);
+      }
+      if(duplicatesInSource){
+        statusEl.textContent += " (يوجد سجلات مكررة في المصدر)";
+      }
+    }
+
+    /**************************************************************************
+     * البحث: شريط البحث هو المسؤول الوحيد — نعرض الملفات كما هي (بدون دمج)
+     **************************************************************************/
+    let scaleFilterActive = false;
+    function search(fromScanner=false, val=""){
+      const q = (fromScanner ? String(val) : (searchBar.value || "")).trim().toLowerCase();
+      resultsTbody.innerHTML = "";
+      if(!Array.isArray(rawExcel) || rawExcel.length <= startIndex){
+        checkClearResultsVisibility();
+        return;
+      }
+      if(q === ""){
+        checkClearResultsVisibility();
+        return;
+      }
+      // نعرض الأسطر كما هي: لا ندمج المتكرر — هذا طلب المستخدم النهائي
+      for(let i = startIndex; i < rawExcel.length; i++){
+        const row = rawExcel[i] || [];
+        if(row.length === 0) continue;
+        const name = getCell(row, NAME_IDX).toLowerCase();
+        const code = getCell(row, CODE_IDX).toLowerCase();
+        const qr = getCell(row, QR_IDX).toLowerCase();
+        if(name.includes(q) || code.includes(q) || qr.includes(q)){
+          const tr = document.createElement('tr');
+          const tdName = document.createElement('td'); tdName.textContent = getCell(row, NAME_IDX); tr.appendChild(tdName);
+          const tdCode = document.createElement('td'); tdCode.textContent = getCell(row, CODE_IDX); tr.appendChild(tdCode);
+          const tdQty = document.createElement('td'); tdQty.textContent = ""; tr.appendChild(tdQty);
+          const tdQr = document.createElement('td'); tdQr.textContent = getCell(row, QR_IDX); tr.appendChild(tdQr);
+
+          const tdAction = document.createElement('td');
+          const receiveBtn = document.createElement('button');
+          receiveBtn.className = 'addBtn';
+          receiveBtn.textContent = 'استلام';
+          receiveBtn.addEventListener('click', ()=> openReceiveModalFromResults(i));
+          tdAction.appendChild(receiveBtn);
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'delBtn';
+          delBtn.textContent = 'حذف';
+          delBtn.addEventListener('click', ()=> { tr.remove(); checkClearResultsVisibility(); });
+          tdAction.appendChild(delBtn);
+
+          tr.appendChild(tdAction);
+
+          tr.dataset.sourceIndex = i;
+          tr.dataset.uid = uidFromRowArray(row);
+
+          resultsTbody.appendChild(tr);
+        }
+      }
+
+      applyScaleFilterTo(resultsTbody);
+      checkClearResultsVisibility();
+    }
+
+    function checkClearResultsVisibility(){ clearResultsBtn.style.display = (resultsTbody.rows.length === 0) ? 'none' : 'inline-block'; }
+    function clearSearch(){ searchBar.value = ""; resultsTbody.innerHTML = ""; checkClearResultsVisibility(); }
+
+    function toggleScaleFilter(){ scaleFilterActive = !scaleFilterActive; scaleBtn.classList.toggle('active', scaleFilterActive); applyScaleFilterTo(resultsTbody); applyScaleFilterTo(finalTbody); }
+    function applyScaleFilterTo(tbody){
+      if(!tbody) return;
+      Array.from(tbody.rows).forEach(row=>{
+        const code = (row.cells[1] && row.cells[1].textContent) || "";
+        row.style.display = (scaleFilterActive && code.trim() === "") ? 'none' : '';
+      });
+    }
+
+    /**************************************************************************
+     * إيجاد صف مطابق بالقيمة (QR exact -> code exact -> name contains)
+     **************************************************************************/
+    function findRowByValue(value){
+      if(!Array.isArray(rawExcel) || rawExcel.length <= startIndex) return null;
+      const v = String(value || "").trim();
+      if(!v) return null;
+      // QR exact
+      for(let i = startIndex; i < rawExcel.length; i++){
+        const row = rawExcel[i] || [];
+        if(getCell(row, QR_IDX).toString().trim() === v) return i;
+      }
+      // code exact
+      for(let i = startIndex; i < rawExcel.length; i++){
+        const row = rawExcel[i] || [];
+        if(getCell(row, CODE_IDX).toString().trim() === v) return i;
+      }
+      // name contains
+      for(let i = startIndex; i < rawExcel.length; i++){
+        const row = rawExcel[i] || [];
+        if(getCell(row, NAME_IDX).toString().toLowerCase().includes(v.toLowerCase())) return i;
+      }
+      return null;
+    }
+
+    /**************************************************************************
+     * مودال: فتح من نتائج البحث أو من تعديل صف في final
+     **************************************************************************/
+    function openReceiveModalFromResults(sourceIndex){
+      modalCurrentSourceIndex = sourceIndex;
+      modalEditingUid = null;
+      modalOpen = true;
+      const row = rawExcel[sourceIndex] || [];
+      modalName.textContent = getCell(row, NAME_IDX) || "";
+      const uid = uidFromRowArray(row);
+      if(finalMap.has(uid)) modalInput.value = finalMap.get(uid).qty || ""; else modalInput.value = "";
+      receiveModalOverlay.style.display = 'flex';
+      setTimeout(()=> { try{ modalInput.focus(); modalInput.select && modalInput.select(); }catch(e){} }, 120);
+    }
+
+    function openEditFinal(uid){
+      if(!finalMap.has(uid)) return;
+      modalEditingUid = uid;
+      modalCurrentSourceIndex = null;
+      modalOpen = true;
+      const entry = finalMap.get(uid);
+      const r = entry.rowArray || entry.rowData || [];
+      modalName.textContent = getCell(r, NAME_IDX) || (entry.rowEl && entry.rowEl.cells[0] && entry.rowEl.cells[0].textContent) || "";
+      modalInput.value = entry.qty || "";
+      receiveModalOverlay.style.display = 'flex';
+      setTimeout(()=> { try{ modalInput.focus(); modalInput.select && modalInput.select(); }catch(e){} }, 120);
+    }
+
+    function closeModal(){
+      receiveModalOverlay.style.display = 'none';
+      modalInput.value = "";
+      modalCurrentSourceIndex = null;
+      modalEditingUid = null;
+      modalOpen = false;
+      lastModalTime = Date.now();
+    }
+
+    /**************************************************************************
+     * numpad & physical keyboard integration for modalInput
+     **************************************************************************/
+    document.querySelectorAll('.numpad button[data-key]').forEach(btn=>{
+      btn.addEventListener('click', ()=> {
+        const k = btn.getAttribute('data-key');
+        insertAtCaret(modalInput, k);
+        modalInput.focus();
+      });
+    });
+    modalBackBtn && modalBackBtn.addEventListener('click', ()=> { backspaceAtCaret(modalInput); modalInput.focus(); });
+
+    function insertAtCaret(input, text){
+      try{
+        const start = input.selectionStart || 0;
+        const end = input.selectionEnd || 0;
+        const val = input.value || "";
+        input.value = val.slice(0,start) + text + val.slice(end);
+        const pos = start + text.length;
+        input.setSelectionRange(pos,pos);
+      }catch(e){
+        input.value = (input.value || "") + text;
+      }
+    }
+    function backspaceAtCaret(input){
+      try{
+        const start = input.selectionStart || 0;
+        const end = input.selectionEnd || 0;
+        if(start === end && start > 0){
+          const val = input.value || "";
+          input.value = val.slice(0, start-1) + val.slice(end);
+          const pos = start-1;
+          input.setSelectionRange(pos,pos);
+        } else {
+          const val = input.value || "";
+          input.value = val.slice(0,start) + val.slice(end);
+          input.setSelectionRange(start,start);
+        }
+      }catch(e){
+        input.value = (input.value || "").slice(0,-1);
+      }
+    }
+
+    // Global keyboard handling: when modal open allow typing even if input not focused; Enter confirms
+    document.addEventListener('keydown', function(e){
+      if(modalOpen){
+        if(e.key === 'Enter'){
+          e.preventDefault(); confirmModal(); return;
+        }
+        if(e.key === 'Escape'){
+          e.preventDefault(); closeModal(); return;
+        }
+        if((e.key >= '0' && e.key <= '9') || e.key === '.'){
+          if(document.activeElement !== modalInput){
+            insertAtCaret(modalInput, e.key); e.preventDefault();
+          }
+          return;
+        }
+        if(e.key === 'Backspace'){
+          if(document.activeElement !== modalInput){ backspaceAtCaret(modalInput); e.preventDefault(); }
+          return;
+        }
+      } else {
+        if(e.key === 'Enter' && document.activeElement === searchBar){
+          e.preventDefault(); search(false);
+        }
+      }
+    });
+
+    modalInput.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); confirmModal(); }
+      else if(e.key === 'Escape'){ e.preventDefault(); closeModal(); }
+    });
+
+    modalConfirmBtn.addEventListener('click', confirmModal);
+    modalCancelBtn.addEventListener('click', closeModal);
+
+    /**************************************************************************
+     * ضبط إضافة/تحديث في جدول final (منع التكرار حسب UID: QR ثم كود الميزان)
+     **************************************************************************/
+    function addOrUpdateFinalFromRow(rowArray, qty){
+      const uid = uidFromRowArray(rowArray);
+      if(finalMap.has(uid)){
+        const existing = finalMap.get(uid);
+        existing.qty = qty;
+        if(existing.rowEl) existing.rowEl.cells[2].textContent = qty;
+        return 'updated';
+      }
+      const tr = document.createElement('tr');
+
+      const tdName = document.createElement('td'); tdName.textContent = getCell(rowArray, NAME_IDX); tr.appendChild(tdName);
+      const tdPrice = document.createElement('td'); tdPrice.textContent = getCell(rowArray, PRICE_IDX); tr.appendChild(tdPrice);
+      const tdQty = document.createElement('td'); tdQty.textContent = qty; tr.appendChild(tdQty);
+      const tdCode = document.createElement('td'); tdCode.textContent = getCell(rowArray, CODE_IDX); tr.appendChild(tdCode);
+      const tdQr = document.createElement('td'); tdQr.textContent = getCell(rowArray, QR_IDX); tr.appendChild(tdQr);
+
+      const tdEdit = document.createElement('td');
+      const editBtn = document.createElement('button'); editBtn.className='editBtn'; editBtn.textContent='تعديل';
+      editBtn.addEventListener('click', ()=> openEditFinal(uid));
+      tdEdit.appendChild(editBtn); tr.appendChild(tdEdit);
+
+      const tdDel = document.createElement('td');
+      const delBtn = document.createElement('button'); delBtn.className='delBtn'; delBtn.textContent='حذف';
+      delBtn.addEventListener('click', ()=> { tr.remove(); finalMap.delete(uid); checkClearAllVisibility(); });
+      tdDel.appendChild(delBtn); tr.appendChild(tdDel);
+
+      finalTbody.appendChild(tr);
+      finalMap.set(uid, { rowEl: tr, qty: qty, rowArray: rowArray });
+      applyScaleFilterTo(finalTbody);
+      checkClearAllVisibility();
+      return 'added';
+    }
+
+    function confirmModal(){
+      const v = (modalInput.value || '').trim();
+      if(v === ''){ alert('لا يمكن ترك الحقل فارغاً'); modalInput.focus(); return; }
+      const num = Number(v);
+      if(!isFinite(num)){ alert('الرجاء إدخال رقم صحيح'); modalInput.focus(); return; }
+
+      if(modalEditingUid){
+        const entry = finalMap.get(modalEditingUid);
+        if(entry && entry.rowEl){ entry.qty = v; entry.rowEl.cells[2].textContent = v; }
+        searchBar.value = ""; closeModal(); return;
+      }
+
+      if(modalCurrentSourceIndex == null){ alert('خطأ: لا توجد بيانات مصدر'); closeModal(); return; }
+
+      const rowArray = rawExcel[modalCurrentSourceIndex] || [];
+      addOrUpdateFinalFromRow(rowArray, v);
+
+      // تحديث الخلية في جدول النتائج (إن كانت مرئية)
+      Array.from(resultsTbody.rows).forEach(r=>{
+        if(r.dataset && r.dataset.sourceIndex){
+          if(Number(r.dataset.sourceIndex) === modalCurrentSourceIndex){
+            r.cells[2].textContent = v;
+          }
+        }
+      });
+
+      searchBar.value = "";
+      closeModal();
+    }
+
+    function checkClearAllVisibility(){ clearAllBtn.style.display = (finalTbody.rows.length === 0) ? 'none' : 'inline-block'; }
+    function clearAllSelected(){ finalTbody.innerHTML = ""; finalMap.clear(); checkClearAllVisibility(); }
+    function clearResults(){ resultsTbody.innerHTML = ""; checkClearResultsVisibility(); }
+
+    /**************************************************************************
+     * تصدير ملف Excel من جدول المنتجات المختارة (مرتب، رؤوس ملونة)
+     * أعمدة التصدير: اسم المنتج | السعر | العدد/الوزن | كود الميزان | QR
+     * سنبني ملف HTML (xls) مع أنماط الرؤوس لضمان مظهر مرتب عند فتحه في Excel.
+     **************************************************************************/
+    function exportFinalToExcel(){
+      const rows = [];
+      rows.push(["اسم المنتج","السعر","العدد/الوزن","كود الميزان","QR"]);
+      for(const [uid, entry] of finalMap){
+        const r = entry.rowArray || [];
+        const name = getCell(r, NAME_IDX) || (entry.rowEl && entry.rowEl.cells[0] && entry.rowEl.cells[0].textContent) || "";
+        const price = getCell(r, PRICE_IDX) || (entry.rowEl && entry.rowEl.cells[1] && entry.rowEl.cells[1].textContent) || "";
+        const qty = entry.qty || (entry.rowEl && entry.rowEl.cells[2] && entry.rowEl.cells[2].textContent) || "";
+        const code = getCell(r, CODE_IDX) || (entry.rowEl && entry.rowEl.cells[3] && entry.rowEl.cells[3].textContent) || "";
+        const qr = getCell(r, QR_IDX) || (entry.rowEl && entry.rowEl.cells[4] && entry.rowEl.cells[4].textContent) || "";
+        rows.push([name, price, qty, code, qr]);
+      }
+
+      // HTML table with inline styles (Excel reads it)
+      let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" lang="ar"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"/></head><body>';
+      html += '<table border="1" style="border-collapse:collapse; font-family: Arial, sans-serif;">';
+      // header row (single color background)
+      const headerBg = '#cfe2ff';
+      html += '<thead><tr>';
+      rows[0].forEach(h => {
+        html += `<th style="background:${headerBg}; font-weight:bold; padding:8px 12px; text-align:center;">${escapeHtml(h)}</th>`;
+      });
+      html += '</tr></thead>';
+      html += '<tbody>';
+      for(let i = 1; i < rows.length; i++){
+        html += '<tr>';
+        rows[i].forEach(cell => {
+          html += `<td style="padding:6px 10px; text-align:center;">${escapeHtml(cell)}</td>`;
+        });
+        html += '</tr>';
+      }
+      html += '</tbody></table></body></html>';
+
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'exported_products.xls';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(s){
+      if(s === undefined || s === null) return '';
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    /**************************************************************************
+     * قارئ QR: **لا ينفذ بحث أو نقل تلقائيًا** — فقط يلصق القيمة في حقل البحث
+     * يختار الكاميرا الخلفية إن وُجدت. الكاميرا تبقى شغالة حتى يضغط المستخدم إيقاف.
+     **************************************************************************/
+    function chooseBackCamera(devices){
+      if(!devices || devices.length === 0) return null;
+      const keywords = ["back","rear","env","environment","back camera","rear camera","الكاميرا الخلفية","خلفي","backcam","rearcam"];
+      for(const d of devices){
+        const label = (d.label || "").toString().toLowerCase();
+        for(const k of keywords) if(label.includes(k)) return d.id || d.deviceId || (d.id ?? d.deviceId);
+      }
+      if(devices.length > 1){
+        const last = devices[devices.length - 1];
+        return last.id || last.deviceId || (last.id ?? last.deviceId);
+      }
+      const first = devices[0];
+      return first.id || first.deviceId || (first.id ?? first.deviceId);
+    }
+
+    async function startScanner(){
+      if(scannerRunning){
+        try{ await html5QrCode.stop(); }catch(e){}
+        try{ html5QrCode.clear(); }catch(e){}
+        html5QrCode = null; readerDiv.innerHTML = ""; scannerRunning = false; cameraBtn.textContent = '📷 الكاميرا';
+        return;
+      }
+
+      readerDiv.innerHTML = ""; readerDiv.style.display = 'block'; cameraBtn.textContent = '⏹ إيقاف الكاميرا';
+      try{
+        html5QrCode = new Html5Qrcode("reader");
+        const devices = await Html5Qrcode.getCameras().catch(()=>[]);
+        const chosenId = chooseBackCamera(devices);
+        const cameraConfig = chosenId ? { deviceId: { exact: chosenId } } : { facingMode: "environment" };
+
+        await html5QrCode.start(
+          cameraConfig,
+          { fps: 10, qrbox: 250 },
+          (decodedText, decodedResult) => {
+            try {
+              const now = Date.now();
+              if(decodedText === lastScan.text && (now - lastScan.time) < lastScan.tolerance){
+                lastScan.time = now; return;
+              }
+              lastScan.text = decodedText; lastScan.time = now;
+
+              // الصق القيمة فقط في حقل البحث — لا بحث تلقائي، لا إضافة
+              searchBar.value = decodedText;
+              try{ searchBar.focus(); }catch(e){}
+            } catch(err){
+              console.error("scan callback error", err);
+            }
+          },
+          (errorMessage) => {
+            // ignore frame errors
+          }
+        );
+        scannerRunning = true;
+      }catch(err){
+        alert('فشل تشغيل الكاميرا: ' + (err && err.message ? err.message : err));
+        readerDiv.innerHTML = ""; readerDiv.style.display = 'none'; scannerRunning = false; cameraBtn.textContent = '📷 الكاميرا';
+      }
+    }
+
+    /**************************************************************************
+     * أحداث UI
+     **************************************************************************/
+    searchBtn.addEventListener('click', ()=> search(false));
+    clearBtn.addEventListener('click', clearSearch);
+    cameraBtn.addEventListener('click', startScanner);
+    scaleBtn.addEventListener('click', toggleScaleFilter);
+    clearResultsBtn.addEventListener('click', ()=> { resultsTbody.innerHTML = ""; checkClearResultsVisibility(); });
+    clearAllBtn.addEventListener('click', clearAllSelected);
+    exportBtn.addEventListener('click', exportFinalToExcel);
+
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' && document.activeElement === searchBar){ e.preventDefault(); search(false); }
+      if(e.key === 'Delete'){ if(finalTbody.rows.length > 0){ finalTbody.deleteRow(finalTbody.rows.length - 1); rebuildFinalMapFromDom(); checkClearAllVisibility(); } }
+    });
+
+    receiveModalOverlay.addEventListener('click', function(e){ if(e.target === receiveModalOverlay) closeModal(); });
+
+    function rebuildFinalMapFromDom(){
+      finalMap.clear();
+      Array.from(finalTbody.rows).forEach(r=>{
+        const name = r.cells[0] ? r.cells[0].textContent : "";
+        const price = r.cells[1] ? r.cells[1].textContent : "";
+        const qty = r.cells[2] ? r.cells[2].textContent : "";
+        const code = r.cells[3] ? r.cells[3].textContent : "";
+        const qr = r.cells[4] ? r.cells[4].textContent : "";
+        const rArr = [name, price, code, qr];
+        const uid = uidFromRowArray(rArr);
+        finalMap.set(uid, { rowEl: r, qty: qty, rowArray: rArr });
+      });
+    }
+
+    const observerFinal = new MutationObserver(()=> applyScaleFilterTo(finalTbody));
+    observerFinal.observe(finalTbody, { childList:true, subtree:true });
+
+    /**************************************************************************
+     * بدء التشغيل: محاولة تحميل ملف الإكسل تلقائياً
+     **************************************************************************/
+    window.addEventListener('load', function(){
+      tryLoadExcelCandidates(excelCandidates);
+      setTimeout(()=>{ try{ searchBar.focus(); }catch(e){} }, 200);
+      checkClearAllVisibility(); checkClearResultsVisibility();
+    });
+
+    function tryLoadExcelCandidates(list){
+      let idx = 0;
+      function attempt(){
+        if(idx >= list.length){
+          statusEl.textContent = "لم يتم العثور على ملف تلقائيًا. استخدم رفع ملف محلي.";
+          statusEl.className = "inactive";
+          return;
+        }
+        const name = list[idx++];
+        fetch(name).then(res=>{
+          if(!res.ok) throw new Error("not found");
+          return res.arrayBuffer();
+        }).then(buff=> parseWorkbookArrayBuffer(buff, name)).catch(err=>{ attempt(); });
+      }
+      attempt();
+    }
+
+    function checkClearResultsVisibility(){ clearResultsBtn.style.display = (resultsTbody.rows.length === 0) ? 'none' : 'inline-block'; }
+    function checkClearAllVisibility(){ clearAllBtn.style.display = (finalTbody.rows.length === 0) ? 'none' : 'inline-block'; }
+
+  </script>
+</body>
+</html>
+          <button id="scaleBtn" class="btn ghost">📶 فلتر كود الميزان</button>
+        </div>
+      </div>
+    </header>
+
+    <div style="margin-bottom:10px;">
+      <label for="fileInput">رفع ملف إكسل محلي (إذا لم يُقرأ تلقائياً): </label>
+      <input id="fileInput" type="file" accept=".xlsx,.xls" />
       <span class="note">الترتيب داخل الإكسل يجب أن يكون: اسم - سعر - كود الميزان - QR</span>
     </div>
 
