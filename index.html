@@ -140,7 +140,7 @@
     <div class="modal" role="document" aria-labelledby="modalTitle">
       <h4 id="modalTitle">استلام المنتج</h4>
       <div id="modalName" style="text-align:center; font-weight:700; margin-bottom:8px"></div>
-      <!-- استخدام input text مع inputmode=decimal ليقبل الكيبورد الفعلي -->
+      <!-- input يدعم الكيبورد الفعلي ويدعم numpad المدمج -->
       <input id="modalInput" class="modal-input" inputmode="decimal" placeholder="العدد أو الوزن (مثال: 2 أو 0.5)" autocomplete="off" />
       <div class="numpad" aria-hidden="false">
         <button type="button" data-key="7">7</button>
@@ -430,7 +430,9 @@
       const uid = uidFromRowArray(row);
       if(finalMap.has(uid)) modalInput.value = finalMap.get(uid).qty || ""; else modalInput.value = "";
       receiveModalOverlay.style.display = 'flex';
-      setTimeout(()=> modalInput.focus(), 120);
+      setTimeout(()=> {
+        try{ modalInput.focus(); modalInput.select && modalInput.select(); }catch(e){}
+      }, 120);
     }
 
     function openEditFinal(uid){
@@ -443,7 +445,9 @@
       modalName.textContent = getCell(r, NAME_IDX) || getCell(r,0) || "";
       modalInput.value = entry.qty || "";
       receiveModalOverlay.style.display = 'flex';
-      setTimeout(()=> modalInput.focus(), 120);
+      setTimeout(()=> {
+        try{ modalInput.focus(); modalInput.select && modalInput.select(); }catch(e){}
+      }, 120);
     }
 
     function closeModal(){
@@ -455,17 +459,15 @@
       lastModalTime = Date.now();
     }
 
-    // numpad buttons interaction + allow keyboard typing
+    // numpad buttons interaction + keep focus on input after click
     document.querySelectorAll('.numpad button[data-key]').forEach(btn=>{
       btn.addEventListener('click', ()=> {
         const k = btn.getAttribute('data-key');
-        // insert at caret
         insertAtCaret(modalInput, k);
         modalInput.focus();
       });
     });
     modalBackBtn && modalBackBtn.addEventListener('click', ()=>{
-      // backspace at caret
       backspaceAtCaret(modalInput);
       modalInput.focus();
     });
@@ -493,7 +495,6 @@
           const pos = start-1;
           input.setSelectionRange(pos,pos);
         } else {
-          // if selection, remove selection
           const val = input.value || "";
           input.value = val.slice(0,start) + val.slice(end);
           input.setSelectionRange(start,start);
@@ -503,17 +504,54 @@
       }
     }
 
-    // allow device keyboard typing naturally; no extra handlers needed,
-    // but ensure Enter on modal triggers confirm:
+    // ensure Enter and digit keys from physical keyboard work when modal open
+    document.addEventListener('keydown', function(e){
+      if(modalOpen){
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          confirmModal();
+          return;
+        }
+        if(e.key === 'Escape'){
+          e.preventDefault();
+          closeModal();
+          return;
+        }
+        // digits, dot, backspace handled to allow typing even when input not focused
+        if((e.key >= '0' && e.key <= '9') || e.key === '.'){
+          // insert character
+          insertAtCaret(modalInput, e.key);
+          e.preventDefault();
+          return;
+        }
+        if(e.key === 'Backspace'){
+          backspaceAtCaret(modalInput);
+          e.preventDefault();
+          return;
+        }
+      } else {
+        // when modal not open, allow Enter in searchBar to trigger search
+        if(e.key === 'Enter' && document.activeElement === searchBar){
+          e.preventDefault();
+          search(false);
+        }
+      }
+    });
+
+    // also ensure modal input Enter key (if focused) triggers confirm
     modalInput.addEventListener('keydown', function(e){
       if(e.key === 'Enter'){
         e.preventDefault();
-        modalConfirmBtn.click();
+        confirmModal();
       } else if(e.key === 'Escape'){
         e.preventDefault();
         closeModal();
       }
     });
+
+    // modal confirm/cancel events
+    modalConfirmBtn.addEventListener('click', confirmModal);
+    modalCancelBtn.addEventListener('click', closeModal);
 
     function confirmModal(){
       const v = (modalInput.value || '').trim();
@@ -527,7 +565,6 @@
           entry.qty = v;
           entry.rowEl.cells[2].textContent = v;
         }
-        // empty search bar
         searchBar.value = "";
         closeModal();
         return;
@@ -555,10 +592,6 @@
 
       closeModal();
     }
-
-    // wire modal confirm/cancel buttons to same handlers
-    modalConfirmBtn.addEventListener('click', confirmModal);
-    modalCancelBtn.addEventListener('click', closeModal);
 
     /**************************************************************************
      * إضافة/تحديث في جدول final مع منع التكرار حسب UID
@@ -600,43 +633,44 @@
 
     /**************************************************************************
      * تصدير final -> إكسل مرتب ومُلوّن الرؤوس
-     * نولد ورقة منظمة: اسم المنتج | السعر | العدد/الوزن | الكود
+     * الأعمدة المطلوبة: اسم المنتج | السعر | العدد/الوزن | كود الميزان | QR
      **************************************************************************/
     function exportFinalToExcel(){
-      const aoa = [["اسم المنتج","السعر","العدد/الوزن","الكود"]];
-      Array.from(finalTbody.rows).forEach(r=>{
-        aoa.push([
-          r.cells[0] ? r.cells[0].textContent : "",
-          r.cells[1] ? r.cells[1].textContent : "",
-          r.cells[2] ? r.cells[2].textContent : "",
-          r.cells[3] ? r.cells[3].textContent : ""
-        ]);
-      });
+      const aoa = [["اسم المنتج","السعر","العدد/الوزن","كود الميزان","QR"]];
+      // preserve insertion order: iterate finalMap
+      for(const [uid, entry] of finalMap){
+        const rowArr = entry.rowArray || [];
+        const name = getCell(rowArr, NAME_IDX) || (entry.rowEl && entry.rowEl.cells[0] && entry.rowEl.cells[0].textContent) || "";
+        const price = getCell(rowArr, PRICE_IDX) || (entry.rowEl && entry.rowEl.cells[1] && entry.rowEl.cells[1].textContent) || "";
+        const qty = entry.qty || (entry.rowEl && entry.rowEl.cells[2] && entry.rowEl.cells[2].textContent) || "";
+        const code = getCell(rowArr, CODE_IDX) || "";
+        const qr = getCell(rowArr, QR_IDX) || "";
+        aoa.push([name, price, qty, code, qr]);
+      }
+
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-      // تعيين عرض أعمدة لجعل الإكسل مقروءاً
-      ws['!cols'] = [{wpx:220},{wpx:90},{wpx:110},{wpx:160}];
+      // set column widths for readability
+      ws['!cols'] = [{wpx:250},{wpx:90},{wpx:110},{wpx:150},{wpx:150}];
 
-      // محاولة وضع style للرؤوس (قد تكون محدودة اعتماداً على مكتبة الشيتس الموجودة)
-      const headerCells = ['A1','B1','C1','D1'];
+      // try to style header row (note: style support depends on environment)
+      const headerCells = ['A1','B1','C1','D1','E1'];
       headerCells.forEach(h=>{
         if(!ws[h]) return;
         ws[h].s = {
-          fill: { fgColor: { rgb: "FFD9EFFF" } },
+          fill: { fgColor: { rgb: "FFCCE5FF" } }, // light blue-ish
           font: { bold: true, color: { rgb: "FF000000" } },
           alignment: { horizontal: "center", vertical: "center" }
         };
       });
 
       XLSX.utils.book_append_sheet(wb, ws, "المنتجات");
-      // writeFile (هذا سيحفظ الملف؛ في بعض بيئات المتصفح قد تكون خصائص النمط غير مدعومة)
       XLSX.writeFile(wb, "exported_products.xlsx");
     }
 
     /**************************************************************************
      * قارئ QR: يختار الكاميرا الخلفية إن وُجدت، لا يوقف الكاميرا بعد فتح المودال.
-     * يفتح مودال الاستلام مرة واحدة لكل مسح (debounce/modalOpen)
      **************************************************************************/
     function chooseBackCamera(devices){
       if(!devices || devices.length === 0) return null;
@@ -701,7 +735,9 @@
                   modalName.textContent = getCell(row, NAME_IDX) || "";
                   if(finalMap.has(uid)) modalInput.value = finalMap.get(uid).qty || ""; else modalInput.value = "";
                   receiveModalOverlay.style.display = 'flex';
-                  setTimeout(()=> modalInput.focus(), 120);
+                  setTimeout(()=> {
+                    try{ modalInput.focus(); modalInput.select && modalInput.select(); }catch(e){}
+                  }, 120);
                   // لا نوقف الماسح — يظل شغالاً حتى يضغط المستخدم زر الإيقاف
                 }
               }
@@ -745,9 +781,8 @@
         const price = r.cells[1] ? r.cells[1].textContent : "";
         const qty = r.cells[2] ? r.cells[2].textContent : "";
         const code = r.cells[3] ? r.cells[3].textContent : "";
-        const rowArray = [name, price, code, ""]; // note: for uidFromRowArray we'll treat 3 as qr if needed
-        // build a rowArray that matches parsing expectation (name, price, code, qr)
-        const rArr = [name, price, code, code]; // best-effort to generate uid
+        // try to build representative rowArray: [name, price, code, qr]
+        const rArr = [name, price, code, code];
         const uid = uidFromRowArray(rArr);
         finalMap.set(uid, { rowEl: r, qty: qty, rowArray: rArr });
       });
