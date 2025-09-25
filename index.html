@@ -119,8 +119,8 @@
                 <th>اسم المنتج</th>
                 <th>السعر</th>
                 <th>العدد/الوزن</th>
-                <th>الكود (QR / كود الميزان)</th>
-                <th>تعديل</th>
+                <th>كود الميزان</th>
+                <th>QR</th>
                 <th>حذف</th>
               </tr>
             </thead>
@@ -504,7 +504,7 @@
       }
     }
 
-    // ensure Enter and digit keys from physical keyboard work when modal open
+    // ensure Enter and keys from physical keyboard work when modal open
     document.addEventListener('keydown', function(e){
       if(modalOpen){
         if(e.key === 'Enter'){
@@ -517,16 +517,21 @@
           closeModal();
           return;
         }
-        // digits, dot, backspace handled to allow typing even when input not focused
+        // When modal is open: allow typing with keyboard — we only prevent default and insert
+        // ourselves to guarantee consistent caret behavior even if input not focused.
         if((e.key >= '0' && e.key <= '9') || e.key === '.'){
-          // insert character
-          insertAtCaret(modalInput, e.key);
-          e.preventDefault();
+          // if modalInput is focused, let browser handle input (to keep native composition), else insert
+          if(document.activeElement !== modalInput){
+            insertAtCaret(modalInput, e.key);
+            e.preventDefault();
+          }
           return;
         }
         if(e.key === 'Backspace'){
-          backspaceAtCaret(modalInput);
-          e.preventDefault();
+          if(document.activeElement !== modalInput){
+            backspaceAtCaret(modalInput);
+            e.preventDefault();
+          }
           return;
         }
       } else {
@@ -608,12 +613,8 @@
       const tdName = document.createElement('td'); tdName.textContent = getCell(rowArray, NAME_IDX); tr.appendChild(tdName);
       const tdPrice = document.createElement('td'); tdPrice.textContent = getCell(rowArray, PRICE_IDX); tr.appendChild(tdPrice);
       const tdQty = document.createElement('td'); tdQty.textContent = qty; tr.appendChild(tdQty);
-      const tdCode = document.createElement('td'); tdCode.textContent = (getCell(rowArray, QR_IDX) || getCell(rowArray, CODE_IDX)); tr.appendChild(tdCode);
-
-      const tdEdit = document.createElement('td');
-      const editBtn = document.createElement('button'); editBtn.className='editBtn'; editBtn.textContent='تعديل';
-      editBtn.addEventListener('click', ()=> openEditFinal(uid));
-      tdEdit.appendChild(editBtn); tr.appendChild(tdEdit);
+      const tdCode = document.createElement('td'); tdCode.textContent = getCell(rowArray, CODE_IDX); tr.appendChild(tdCode);
+      const tdQr = document.createElement('td'); tdQr.textContent = getCell(rowArray, QR_IDX); tr.appendChild(tdQr);
 
       const tdDel = document.createElement('td');
       const delBtn = document.createElement('button'); delBtn.className='delBtn'; delBtn.textContent='حذف';
@@ -632,41 +633,60 @@
     function clearTable(id){ const el = document.getElementById(id); if(!el) return; el.querySelector('tbody').innerHTML=""; if(id==='finalTable') finalMap.clear(); checkClearAllVisibility(); checkClearResultsVisibility(); }
 
     /**************************************************************************
-     * تصدير final -> إكسل مرتب ومُلوّن الرؤوس
-     * الأعمدة المطلوبة: اسم المنتج | السعر | العدد/الوزن | كود الميزان | QR
+     * **تصدير ملف Excel مرتب ومهندم (HTML-based .xls)**
+     * نولد ملف HTML يحتوي جدول منسق (خلفية رؤوس، محاذاة، أعمدة)
+     * الأعمدة: اسم المنتج | السعر | العدد/الوزن | كود الميزان | QR
      **************************************************************************/
     function exportFinalToExcel(){
-      const aoa = [["اسم المنتج","السعر","العدد/الوزن","كود الميزان","QR"]];
-      // preserve insertion order: iterate finalMap
+      // Build rows (preserve insertion order of finalMap)
+      const rows = [];
+      // header
+      rows.push(["اسم المنتج","السعر","العدد/الوزن","كود الميزان","QR"]);
       for(const [uid, entry] of finalMap){
-        const rowArr = entry.rowArray || [];
-        const name = getCell(rowArr, NAME_IDX) || (entry.rowEl && entry.rowEl.cells[0] && entry.rowEl.cells[0].textContent) || "";
-        const price = getCell(rowArr, PRICE_IDX) || (entry.rowEl && entry.rowEl.cells[1] && entry.rowEl.cells[1].textContent) || "";
+        const r = entry.rowArray || [];
+        const name = getCell(r, NAME_IDX) || (entry.rowEl && entry.rowEl.cells[0] && entry.rowEl.cells[0].textContent) || "";
+        const price = getCell(r, PRICE_IDX) || (entry.rowEl && entry.rowEl.cells[1] && entry.rowEl.cells[1].textContent) || "";
         const qty = entry.qty || (entry.rowEl && entry.rowEl.cells[2] && entry.rowEl.cells[2].textContent) || "";
-        const code = getCell(rowArr, CODE_IDX) || "";
-        const qr = getCell(rowArr, QR_IDX) || "";
-        aoa.push([name, price, qty, code, qr]);
+        const code = getCell(r, CODE_IDX) || (entry.rowEl && entry.rowEl.cells[3] && entry.rowEl.cells[3].textContent) || "";
+        const qr = getCell(r, QR_IDX) || (entry.rowEl && entry.rowEl.cells[4] && entry.rowEl.cells[4].textContent) || "";
+        rows.push([name, price, qty, code, qr]);
       }
 
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-
-      // set column widths for readability
-      ws['!cols'] = [{wpx:250},{wpx:90},{wpx:110},{wpx:150},{wpx:150}];
-
-      // try to style header row (note: style support depends on environment)
-      const headerCells = ['A1','B1','C1','D1','E1'];
-      headerCells.forEach(h=>{
-        if(!ws[h]) return;
-        ws[h].s = {
-          fill: { fgColor: { rgb: "FFCCE5FF" } }, // light blue-ish
-          font: { bold: true, color: { rgb: "FF000000" } },
-          alignment: { horizontal: "center", vertical: "center" }
-        };
+      // Build HTML table string with inline styles for header
+      let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" lang="ar"><head><meta charset="utf-8" /></head><body>';
+      html += '<table border="1" style="border-collapse:collapse;">';
+      // header with background color
+      html += '<thead><tr>';
+      const headerBg = '#cfe2ff';
+      rows[0].forEach(h => {
+        html += `<th style="background:${headerBg}; font-weight:bold; padding:6px 10px; text-align:center;">${escapeHtml(h)}</th>`;
       });
+      html += '</tr></thead>';
+      html += '<tbody>';
+      for(let i = 1; i < rows.length; i++){
+        html += '<tr>';
+        rows[i].forEach(cell => {
+          html += `<td style="padding:6px 8px; text-align:center;">${escapeHtml(cell)}</td>`;
+        });
+        html += '</tr>';
+      }
+      html += '</tbody></table></body></html>';
 
-      XLSX.utils.book_append_sheet(wb, ws, "المنتجات");
-      XLSX.writeFile(wb, "exported_products.xlsx");
+      // create blob and download as .xls (Excel will open and preserve inline styles)
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'exported_products.xls';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(s){
+      if(s === undefined || s === null) return '';
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
     /**************************************************************************
@@ -738,7 +758,6 @@
                   setTimeout(()=> {
                     try{ modalInput.focus(); modalInput.select && modalInput.select(); }catch(e){}
                   }, 120);
-                  // لا نوقف الماسح — يظل شغالاً حتى يضغط المستخدم زر الإيقاف
                 }
               }
             } catch(err){
@@ -781,8 +800,8 @@
         const price = r.cells[1] ? r.cells[1].textContent : "";
         const qty = r.cells[2] ? r.cells[2].textContent : "";
         const code = r.cells[3] ? r.cells[3].textContent : "";
-        // try to build representative rowArray: [name, price, code, qr]
-        const rArr = [name, price, code, code];
+        const qr = r.cells[4] ? r.cells[4].textContent : "";
+        const rArr = [name, price, code, qr];
         const uid = uidFromRowArray(rArr);
         finalMap.set(uid, { rowEl: r, qty: qty, rowArray: rArr });
       });
