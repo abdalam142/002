@@ -2,11 +2,10 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <!-- Force desktop layout on mobile as requested -->
   <meta name="viewport" content="width=1200" />
   <title>نظام بحث واستلام المنتجات (Excel + QR)</title>
 
-  <!-- Libraries -->
+  <!-- مكتبات -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8"></script>
 
@@ -40,7 +39,7 @@
     #reader { width:100%; max-width:420px; margin-top:8px; }
     @media (max-width:900px){ .col.half{flex: 0 0 100%} #reader{width:100%} .controls{flex-direction:column; align-items:flex-start} }
 
-    /* Modal */
+    /* مودال */
     .modal-overlay{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:999}
     .modal{background:#fff; border-radius:10px; padding:14px; width:420px; max-width:95%; box-sizing:border-box;}
     .modal h4{margin:0 0 8px}
@@ -56,7 +55,7 @@
 
   <div class="wrap">
     <header>
-      <h1>نظام بحث واستلام المنتجات (من ملف Excel)</h1>
+      <h1>نظام بحث واستلام المنتجات (Excel + QR)</h1>
       <div class="controls">
         <div style="display:flex; align-items:center; gap:8px;">
           <input id="searchBar" type="text" placeholder="ابحث بالاسم أو كود الميزان أو QR" aria-label="بحث">
@@ -209,15 +208,18 @@
     // scanner state
     let html5QrCode = null;
     let scannerRunning = false;
-    let lastScan = { text: null, time: 0, tolerance: 800 };
+    let lastScan = { text: null, time: 0, tolerance: 900 };
 
     // modal state
     let modalCurrentSourceIndex = null; // index in rawExcel when opened from results
     let modalEditingUid = null;         // uid when editing existing final entry
     let modalOpen = false;
+    let lastModalUid = null;
+    let lastModalTime = 0;
+    const MODAL_COOLDOWN = 800;
 
     /**************************************************************************
-     * Excel parsing
+     * قراءة الإكسل
      **************************************************************************/
     function parseWorkbookArrayBuffer(buff, sourceName){
       try {
@@ -289,9 +291,32 @@
       return "NAME::" + name;
     }
 
+    function findRowByValue(value){
+      if(!Array.isArray(rawExcel) || rawExcel.length <= startIndex) return null;
+      const v = String(value || "").trim();
+      if(!v) return null;
+      // QR exact
+      for(let i = startIndex; i < rawExcel.length; i++){
+        const row = rawExcel[i] || [];
+        if(getCell(row, QR_IDX).toString().trim() === v) return i;
+      }
+      // code exact
+      for(let i = startIndex; i < rawExcel.length; i++){
+        const row = rawExcel[i] || [];
+        if(getCell(row, CODE_IDX).toString().trim() === v) return i;
+      }
+      // name contains
+      for(let i = startIndex; i < rawExcel.length; i++){
+        const row = rawExcel[i] || [];
+        if(getCell(row, NAME_IDX).toString().toLowerCase().includes(v.toLowerCase())) return i;
+      }
+      return null;
+    }
+
     /**************************************************************************
      * Search - show rows AS-IS from rawExcel (do NOT dedupe)
      **************************************************************************/
+    let scaleFilterActive = false;
     function search(fromScanner=false, val=""){
       const q = (fromScanner ? String(val) : (searchBar.value || "")).trim().toLowerCase();
       resultsTbody.innerHTML = "";
@@ -337,15 +362,35 @@
 
       applyScaleFilterTo(resultsTbody);
       checkClearResultsVisibility();
+
+      // If search triggered by scanner, automatically open modal for best match (if any)
+      if(fromScanner && val){
+        const matchIndex = findRowByValue(val);
+        if(matchIndex !== null){
+          // avoid reopening modal repeatedly for same uid within cooldown
+          const uid = uidFromRowArray(rawExcel[matchIndex]);
+          const now = Date.now();
+          if(modalOpen) {
+            // if modal already open, don't interrupt
+            return;
+          }
+          if(lastModalUid === uid && (now - lastModalTime) < MODAL_COOLDOWN){
+            return;
+          }
+          // find the corresponding tr in results and open modal
+          const targetTr = Array.from(resultsTbody.rows).find(r => Number(r.dataset.sourceIndex) === matchIndex);
+          if(targetTr){
+            lastModalUid = uid;
+            lastModalTime = now;
+            openReceiveModalFromResults(matchIndex);
+          }
+        }
+      }
     }
 
-    function clearSearch(){ searchBar.value = ""; resultsTbody.innerHTML = ""; checkClearResultsVisibility(); }
     function checkClearResultsVisibility(){ clearResultsBtn.style.display = (resultsTbody.rows.length === 0) ? 'none' : 'inline-block'; }
+    function clearSearch(){ searchBar.value = ""; resultsTbody.innerHTML = ""; checkClearResultsVisibility(); }
 
-    /**************************************************************************
-     * Scale filter: hides rows without scale code when active
-     **************************************************************************/
-    let scaleFilterActive = false;
     function toggleScaleFilter(){
       scaleFilterActive = !scaleFilterActive;
       scaleBtn.classList.toggle('active', scaleFilterActive);
@@ -361,7 +406,7 @@
     }
 
     /**************************************************************************
-     * Modal (open from results or edit from final)
+     * Modal: فتح من نتائج البحث أو تعديل من final
      **************************************************************************/
     function openReceiveModalFromResults(sourceIndex){
       modalCurrentSourceIndex = sourceIndex;
@@ -395,7 +440,7 @@
       modalOpen = false;
     }
 
-    // numpad interaction + caret helpers
+    // numpad buttons
     document.querySelectorAll('.numpad button[data-key]').forEach(btn=>{
       btn.addEventListener('click', ()=> {
         const k = btn.getAttribute('data-key');
@@ -432,21 +477,27 @@
       }catch(e){ input.value = (input.value || "").slice(0,-1); }
     }
 
-    // ensure keyboard interaction works when modal open (enter confirms, digits typed)
+    // keyboard handling for modal and global
     document.addEventListener('keydown', function(e){
       if(modalOpen){
         if(e.key === 'Enter'){ e.preventDefault(); modalConfirm(); return; }
         if(e.key === 'Escape'){ e.preventDefault(); closeModal(); return; }
         if((e.key >= '0' && e.key <= '9') || e.key === '.'){
-          if(document.activeElement !== modalInput){ insertAtCaret(modalInput, e.key); e.preventDefault(); }
+          if(document.activeElement !== modalInput){
+            insertAtCaret(modalInput, e.key); e.preventDefault();
+          }
           return;
         }
         if(e.key === 'Backspace'){
-          if(document.activeElement !== modalInput){ backspaceAtCaret(modalInput); e.preventDefault(); }
+          if(document.activeElement !== modalInput){
+            backspaceAtCaret(modalInput); e.preventDefault();
+          }
           return;
         }
       } else {
-        if(e.key === 'Enter' && document.activeElement === searchBar){ e.preventDefault(); search(false); }
+        if(e.key === 'Enter' && document.activeElement === searchBar){
+          e.preventDefault(); search(false);
+        }
       }
     });
 
@@ -471,6 +522,7 @@
           entry.rowEl.cells[1].textContent = v;
         }
         searchBar.value = "";
+        try{ searchBar.focus(); }catch(e){}
         closeModal();
         return;
       }
@@ -483,14 +535,15 @@
       const rowArray = rawExcel[modalCurrentSourceIndex] || [];
       addOrUpdateFinalFromRow(rowArray, v);
 
-      // clear search bar after adding
+      // clear search bar after successful add/update and focus it
       searchBar.value = "";
+      try{ searchBar.focus(); }catch(e){}
+
       closeModal();
     }
 
     /**************************************************************************
-     * Add / Update final table (prevent duplicates by UID: QR then scale code)
-     * Final table columns: Name | Qty | Scale Code | QR | Edit | Delete
+     * Add / Update final table
      **************************************************************************/
     function addOrUpdateFinalFromRow(rowArray, qty){
       const uid = uidFromRowArray(rowArray);
@@ -529,9 +582,8 @@
     function clearAllSelected(){ finalTbody.innerHTML = ""; finalMap.clear(); checkClearAllVisibility(); }
 
     /**************************************************************************
-     * Export final table to Excel (neat + colored headers)
-     * Columns: اسم المنتج | السعر | العدد/الوزن | كود الميزان | QR
-     * We'll fetch السعر from the original rowArray if available.
+     * تصدير ملف Excel مُنسّق من finalMap
+     * أعمدة: اسم المنتج | السعر | العدد/الوزن | كود الميزان | QR
      **************************************************************************/
     function exportFinalToExcel(){
       const rows = [];
@@ -546,19 +598,16 @@
         rows.push([name, price, qty, code, qr]);
       }
 
-      // header colors (one per column)
       const headerColors = ['#cfe2ff','#d1e7dd','#fff3cd','#f8d7da','#e2e3e5'];
 
       let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" lang="ar"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"/></head><body>';
       html += '<table border="1" style="border-collapse:collapse; font-family: Arial, sans-serif;">';
-      // header
       html += '<thead><tr>';
       rows[0].forEach((h, idx) => {
         const bg = headerColors[idx % headerColors.length];
         html += `<th style="background:${bg}; font-weight:bold; padding:8px 12px; text-align:center;">${escapeHtml(h)}</th>`;
       });
       html += '</tr></thead>';
-      // body
       html += '<tbody>';
       for(let i = 1; i < rows.length; i++){
         html += '<tr>';
@@ -586,8 +635,8 @@
     }
 
     /**************************************************************************
-     * QR Scanner: only paste decoded value into searchBar (no auto-search, no auto-add)
-     * Choose back camera when possible. Scanner stays running until user stops it.
+     * قارئ QR: يلصق القيمة في شريط البحث، ثم يقوم ببحث تلقائي ويفتح مودال التسجيل
+     * يختار الكاميرا الخلفية إن وُجدت. الكاميرا لا تتوقف بعد فتح المودال.
      **************************************************************************/
     function chooseBackCamera(devices){
       if(!devices || devices.length === 0) return null;
@@ -630,9 +679,16 @@
               }
               lastScan.text = decodedText; lastScan.time = now;
 
-              // Paste value into searchBar only; do NOT auto-search or auto-add
+              // If modal is open, ignore new scans to avoid interference
+              if(modalOpen) return;
+
+              // Paste value into searchBar
               searchBar.value = decodedText;
               try{ searchBar.focus(); }catch(e){}
+
+              // Trigger automatic search and modal opening
+              search(true, decodedText);
+
             } catch(err){
               console.error("scan callback error", err);
             }
@@ -659,14 +715,18 @@
     clearAllBtn.addEventListener('click', clearAllSelected);
     exportBtn.addEventListener('click', exportFinalToExcel);
 
-    // Enter in searchBar triggers search
     searchBar.addEventListener('keydown', function(e){
       if(e.key === 'Enter'){ e.preventDefault(); search(false); }
     });
 
-    // keyboard Delete to remove last final row
     document.addEventListener('keydown', function(e){
-      if(e.key === 'Delete'){ if(finalTbody.rows.length > 0){ finalTbody.deleteRow(finalTbody.rows.length - 1); rebuildFinalMapFromDom(); checkClearAllVisibility(); } }
+      if(e.key === 'Delete'){
+        if(finalTbody.rows.length > 0){
+          finalTbody.deleteRow(finalTbody.rows.length - 1);
+          rebuildFinalMapFromDom();
+          checkClearAllVisibility();
+        }
+      }
     });
 
     receiveModalOverlay.addEventListener('click', function(e){ if(e.target === receiveModalOverlay) closeModal(); });
@@ -688,7 +748,7 @@
     observerFinal.observe(finalTbody, { childList:true, subtree:true });
 
     /**************************************************************************
-     * Startup: try to load candidate Excel files automatically
+     * بدء التشغيل: محاولة تحميل ملف الإكسل تلقائياً
      **************************************************************************/
     window.addEventListener('load', function(){
       tryLoadExcelCandidates(excelCandidates);
@@ -714,7 +774,7 @@
     }
 
     /**************************************************************************
-     * Utility
+     * Utilities
      **************************************************************************/
     function checkClearAllVisibility(){ clearAllBtn.style.display = (finalTbody.rows.length === 0) ? 'none' : 'inline-block'; }
     function checkClearResultsVisibility(){ clearResultsBtn.style.display = (resultsTbody.rows.length === 0) ? 'none' : 'inline-block'; }
